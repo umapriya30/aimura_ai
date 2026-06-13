@@ -1,0 +1,8 @@
+role_name,required_technical_skills,entry_route,typical_dream_companies,realistic_timeline,related_fields
+Machine Learning Engineer,"Python; statistics; machine learning; MLOps; cloud deployment","data analyst or ML intern to junior ML engineer","Microsoft; Google; DeepMind; OpenAI; Amazon",2-4 years after graduation,"Data Science and AI; Software Engineering"
+Data Scientist,"Python; SQL; statistics; experimentation; visualization","analytics intern to junior data scientist","Microsoft; Spotify; Meta; Revolut; Deloitte",1-3 years after graduation,"Data Science and AI; Business Analytics"
+Software Engineer,"programming; data structures; APIs; testing; Git","software intern to junior software engineer","Microsoft; Amazon; Google; Atlassian; Shopify",0-2 years after graduation,"Software Engineering; Data Science and AI"
+Cybersecurity Analyst,"networking; Linux; threat analysis; SIEM tools; incident response","IT support or security intern to SOC analyst","Microsoft; CrowdStrike; IBM; Accenture; Cisco",1-3 years after graduation,"Cybersecurity; Software Engineering"
+Product Analyst,"SQL; dashboards; product metrics; experimentation; communication","business analyst or data intern to product analyst","Microsoft; Uber; Wise; Amazon; Spotify",1-2 years after graduation,"Business Analytics; Data Science and AI"
+Financial Analyst,"Excel; financial modelling; statistics; market research; reporting","finance intern to analyst program","Goldman Sachs; JPMorgan; Bloomberg; Morgan Stanley",0-2 years after graduation,"Finance Analytics; Business Analytics"
+

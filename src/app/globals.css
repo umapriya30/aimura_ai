@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+@theme {
+  --color-aimura-black: #020817;
+  --color-aimura-ink: #061225;
+  --color-aimura-navy: #081a33;
+  --color-aimura-panel: #0c2039;
+  --color-aimura-panel-2: #102b49;
+  --color-aimura-panel-3: #14365a;
+  --color-aimura-line: #234361;
+  --color-aimura-moss: #7d93aa;
+  --color-aimura-muted: #bdd1df;
+  --color-aimura-white: #f7fbff;
+  --color-aimura-green: #2ce6a1;
+  --color-aimura-mint: #86f6c9;
+  --color-aimura-blue: #38d8ff;
+  --color-aimura-sky: #123a62;
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --radius-card: 1.25rem;
+  --radius-control: 999px;
+  --shadow-green: 0 18px 50px rgb(44 230 161 / 0.28);
+  --shadow-panel: 0 28px 90px rgb(0 6 18 / 0.46);
+  --shadow-soft: 0 20px 55px rgb(0 10 28 / 0.28);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 14% 8%, rgb(44 230 161 / 0.16), transparent 34rem),
+    radial-gradient(circle at 82% 18%, rgb(56 216 255 / 0.14), transparent 32rem),
+    radial-gradient(circle at 52% 94%, rgb(167 139 250 / 0.13), transparent 40rem),
+    linear-gradient(145deg, #020817 0%, #061225 45%, #09203c 100%);
+  background-attachment: fixed;
+  color: var(--color-aimura-white);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgb(44 230 161 / 0.32);
+  color: #ffffff;
+}
+
+.aimura-shell {
+  background:
+    radial-gradient(circle at 12% 0%, rgb(44 230 161 / 0.16), transparent 34rem),
+    radial-gradient(circle at 92% 12%, rgb(56 216 255 / 0.16), transparent 36rem),
+    radial-gradient(circle at 45% 100%, rgb(168 85 247 / 0.11), transparent 38rem),
+    linear-gradient(145deg, #020817 0%, #061225 44%, #09203c 100%);
+  position: relative;
+  overflow-x: clip;
+}
+
+.aimura-card {
+  border: 1px solid rgb(165 210 255 / 0.14);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.03)),
+    linear-gradient(160deg, rgb(12 32 57 / 0.9), rgb(4 16 32 / 0.94));
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(22px);
+}
+
+.aimura-glass {
+  border: 1px solid rgb(165 210 255 / 0.14);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.022)),
+    rgb(6 18 37 / 0.72);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(20px);
+}
+
+.aimura-gradient-card {
+  --accent: #2ce6a1;
+  --accent-2: #38d8ff;
+  --accent-soft: rgb(44 230 161 / 0.12);
+  --accent-border: rgb(44 230 161 / 0.28);
+  border: 1px solid var(--accent-border);
+  background:
+    radial-gradient(circle at 12% 8%, var(--accent-soft), transparent 36%),
+    linear-gradient(145deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.028)),
+    linear-gradient(160deg, rgb(10 31 55 / 0.94), rgb(4 14 28 / 0.96));
+  box-shadow: 0 22px 68px rgb(0 8 22 / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(22px);
+}
+
+.aimura-no-left-line {
+  border-left-color: transparent !important;
+}
+
+.aimura-category-icon {
+  --accent: #2ce6a1;
+  --accent-soft: rgb(44 230 161 / 0.12);
+  align-items: center;
+  background:
+    radial-gradient(circle at 35% 18%, rgb(255 255 255 / 0.18), transparent 38%),
+    var(--accent-soft);
+  border: 1px solid var(--accent-border, rgb(44 230 161 / 0.3));
+  box-shadow: inset 0 0 18px var(--accent-soft), 0 10px 26px rgb(0 0 0 / 0.2);
+  color: var(--accent);
+  display: inline-flex;
+  justify-content: center;
+}
+
+.aimura-accent-text {
+  color: var(--accent, #2ce6a1);
+}
+
+.aimura-role-label {
+  color: var(--accent-label, var(--accent, #2ce6a1));
+}
+
+.aimura-role-title {
+  color: var(--accent-title, #f7fbff);
+}
+
+.aimura-role-value {
+  color: var(--accent-value, var(--accent-2, #86f6c9));
+}
+
+.aimura-role-body {
+  color: var(--accent-body, #bdd1df);
+}
+
+.aimura-role-subtle {
+  color: var(--accent-subtle, #7d93aa);
+}
+
+.aimura-role-meta {
+  color: var(--accent-meta, var(--accent-2, #86f6c9));
+}
+
+.aimura-accent-bg {
+  background: linear-gradient(135deg, var(--accent, #2ce6a1), var(--accent-2, #38d8ff));
+}
+
+.aimura-accent-border {
+  border-color: var(--accent-border, rgb(44 230 161 / 0.3));
+}
+
+.aimura-progress-rail {
+  background: linear-gradient(90deg, var(--accent, #2ce6a1), var(--accent-2, #38d8ff));
+}
+
+.aimura-green-glow {
+  box-shadow: var(--shadow-green);
+}
+
+.aimura-focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+}
+
+.aimura-focus-ring:focus-visible {
+  outline-color: #2ce6a1;
+}
+
+@keyframes aimura-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes journey-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.journey-pop {
+  animation: journey-pop 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.aimura-rise {
+  animation: aimura-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.aimura-no-scrollbar {
+  scrollbar-width: none;
+}
+
+.aimura-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  body,
+  .aimura-shell {
+    background: #ffffff !important;
+    color: #0b1220 !important;
+  }
+
+  header,
+  aside,
+  button,
+  .print-hidden {
+    display: none !important;
+  }
+
+  .aimura-card,
+  .aimura-glass,
+  .aimura-gradient-card {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    color: #0b1220 !important;
+  }
+}
