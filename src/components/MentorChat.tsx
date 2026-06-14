@@ -25,8 +25,11 @@ export function MentorChat({ report }: MentorChatProps) {
   const theme = categoryThemes.mentor;
   const firstName = report.studentName.split(" ")[0] || "there";
   const targetRole = report.domainProfile.targetRoles[0] || "your target role";
+  const noFormalStudy = /(do not|don't|dont|not planning formal study)/i.test(`${report.answers.studyGoal} ${report.answers.studyLocationIntent}`);
 
-  const greeting = `Hi ${firstName}, I'm your Aimura AI mentor. You're aiming for ${targetRole} in ${report.domainProfile.normalizedField}, and your skill score is ${report.skillScore}/100. Ask me what to learn first, how to plan your week, how to close ${report.domainProfile.missingSkills.slice(0, 2).join(" and ")}, or anything about your roadmap.`;
+  const greeting = noFormalStudy
+    ? `Hi ${firstName}, I'm your Aimura AI mentor. You said formal study does not feel right right now, and that is completely okay. I can help you think through why, compare non-degree routes, build proof for ${targetRole}, or leave you with a positive plan until your mind changes.`
+    : `Hi ${firstName}, I'm your Aimura AI mentor. You're aiming for ${targetRole} in ${report.domainProfile.normalizedField}, and your skill score is ${report.skillScore}/100. Ask me what to learn first, how to plan your week, how to close ${report.domainProfile.missingSkills.slice(0, 2).join(" and ")}, or anything about your roadmap.`;
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: createId(), role: "assistant", content: greeting },
@@ -34,6 +37,7 @@ export function MentorChat({ report }: MentorChatProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [engine, setEngine] = useState<string | null>(null);
+  const [providerNote, setProviderNote] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const engineLabel =
@@ -42,16 +46,17 @@ export function MentorChat({ report }: MentorChatProps) {
       : engine === "openai" || engine === "anthropic"
         ? "Live AI reasoning"
         : engine === "offline"
-          ? "Foundry IQ-ready offline guidance"
+          ? "Offline guidance"
           : null;
 
   const topGap = report.domainProfile.missingSkills[0] || "my weak areas";
   const suggestions = [
+    ...(noFormalStudy ? ["I don't want to study. What else can I do?", "Help me understand why study feels wrong right now."] : []),
     "What should I do this week?",
     `How do I close ${topGap}?`,
     "What project should I build?",
     "How strong is my profile?",
-    "Which universities fit me?",
+    ...(noFormalStudy ? [] : ["Which universities fit me?"]),
     "How do I prepare for interviews?",
     "I feel overwhelmed, where do I start?",
     "What's the job market like?",
@@ -87,7 +92,17 @@ export function MentorChat({ report }: MentorChatProps) {
         throw new Error("The mentor is unavailable right now.");
       }
 
-      setEngine(response.headers.get("x-aimura-engine"));
+      const nextEngine = response.headers.get("x-aimura-engine");
+      const configuredProviders = response.headers.get("x-aimura-configured-providers") || "none";
+      const providerErrors = response.headers.get("x-aimura-provider-errors") || "";
+      setEngine(nextEngine);
+      setProviderNote(
+        nextEngine === "offline"
+          ? configuredProviders === "none"
+            ? "No live AI provider is configured. Add Azure/OpenAI keys and restart the app."
+            : `Live provider configured (${configuredProviders}) but could not connect. ${providerErrors || "Check endpoint, deployment name, quota, and network access."}`
+          : null,
+      );
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -128,15 +143,20 @@ export function MentorChat({ report }: MentorChatProps) {
 
   return (
     <div className="flex flex-col gap-4" style={categoryStyle(theme)}>
-      <div className="aimura-role-label flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em]">
+      <div className="aimura-role-label flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em]">
         <Sparkles className="size-4" aria-hidden />
         Aimura AI mentor
         {engineLabel ? (
-          <span className="aimura-role-value ml-auto rounded-control border px-3 py-1 text-[0.65rem] font-medium normal-case tracking-normal" style={{ background: theme.soft, borderColor: theme.border }}>
+          <span className="aimura-role-value w-full rounded-control border px-3 py-1 text-[0.65rem] font-medium normal-case tracking-normal sm:ml-auto sm:w-auto" style={{ background: theme.soft, borderColor: theme.border }}>
             {engineLabel}
           </span>
         ) : null}
       </div>
+      {providerNote ? (
+        <div className="rounded-2xl border border-amber-300/35 bg-amber-300/10 px-4 py-3 text-xs leading-5 text-amber-100">
+          {providerNote}
+        </div>
+      ) : null}
 
       <div
         ref={scrollRef}
@@ -146,7 +166,7 @@ export function MentorChat({ report }: MentorChatProps) {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${
+            className={`max-w-[94%] break-words rounded-2xl px-4 py-3 text-sm leading-7 sm:max-w-[88%] ${
               message.role === "user"
                 ? "aimura-role-title self-end border"
                 : "aimura-role-body self-start border border-aimura-moss/25 bg-aimura-panel"
@@ -169,7 +189,7 @@ export function MentorChat({ report }: MentorChatProps) {
           {suggestions.map((suggestion) => (
             <button
               key={suggestion}
-              className="aimura-focus-ring aimura-role-meta rounded-control border bg-aimura-panel/50 px-3 py-1.5 text-xs transition hover:text-aimura-white disabled:opacity-40"
+              className="aimura-focus-ring aimura-role-meta max-w-full whitespace-normal break-words rounded-2xl border bg-aimura-panel/50 px-3 py-1.5 text-left text-xs transition hover:text-aimura-white disabled:opacity-40 sm:rounded-control"
               disabled={isStreaming}
               onClick={() => sendMessage(suggestion)}
               style={{ borderColor: theme.border }}
@@ -182,7 +202,7 @@ export function MentorChat({ report }: MentorChatProps) {
       ) : null}
 
       <form
-        className="flex items-center gap-2"
+        className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center"
         onSubmit={(event) => {
           event.preventDefault();
           sendMessage(input);
@@ -190,14 +210,14 @@ export function MentorChat({ report }: MentorChatProps) {
       >
         <input
           aria-label="Ask the Aimura AI mentor"
-          className="aimura-focus-ring aimura-role-title flex-1 rounded-control border bg-aimura-panel/50 px-4 py-3 text-sm outline-none placeholder:text-aimura-moss"
+          className="aimura-focus-ring aimura-role-title w-full min-w-0 flex-1 rounded-control border bg-aimura-panel/50 px-4 py-3 text-sm outline-none placeholder:text-aimura-moss"
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask your mentor anything about your path..."
           style={{ borderColor: theme.border }}
           value={input}
         />
         <button
-          className="aimura-focus-ring inline-flex items-center gap-2 rounded-control px-5 py-3 text-sm font-semibold text-aimura-white transition disabled:cursor-not-allowed disabled:opacity-50"
+          className="aimura-focus-ring inline-flex w-full items-center justify-center gap-2 rounded-control px-5 py-3 text-sm font-semibold text-aimura-white transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           disabled={isStreaming || !input.trim()}
           style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, boxShadow: theme.shadow }}
           type="submit"

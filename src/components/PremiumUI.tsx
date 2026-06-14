@@ -41,7 +41,7 @@ export function GradientCard({
   style?: CSSProperties;
 }) {
   return (
-    <div className={`aimura-gradient-card rounded-card ${className}`} style={{ ...(theme ? categoryStyle(theme) : {}), ...style }}>
+    <div className={`aimura-gradient-card min-w-0 max-w-full rounded-card ${className}`} style={{ ...(theme ? categoryStyle(theme) : {}), ...style }}>
       {children}
     </div>
   );
@@ -69,7 +69,7 @@ export function SectionHeader({
         borderColor: theme.border,
       }}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-3">
           {Icon ? (
             <span className="aimura-category-icon size-11 shrink-0 rounded-2xl" style={categoryStyle(theme)}>
@@ -80,11 +80,11 @@ export function SectionHeader({
             <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.2em]">
               {theme.eyebrow}
             </p>
-            <h3 className="aimura-role-title mt-2 text-2xl font-semibold tracking-[-0.03em]">{title}</h3>
+            <h3 className="aimura-role-title mt-2 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{title}</h3>
             {description ? <p className="aimura-role-body mt-2 max-w-3xl text-sm leading-6">{description}</p> : null}
           </div>
         </div>
-        {meta ? <div className="shrink-0">{meta}</div> : null}
+        {meta ? <div className="min-w-0 shrink-0 sm:max-w-[45%]">{meta}</div> : null}
       </div>
     </div>
   );
@@ -105,17 +105,17 @@ export function MetricCard({
 }) {
   return (
     <div
-      className="group rounded-[1.1rem] border bg-white/[0.035] p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-white/[0.055]"
+      className="group min-w-0 max-w-full rounded-[1.1rem] border bg-white/[0.035] p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-white/[0.055]"
       style={{ ...categoryStyle(theme), borderColor: theme.border, boxShadow: "inset 0 1px 0 rgb(255 255 255 / 0.06)" }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <span className="aimura-category-icon size-10 rounded-2xl" style={categoryStyle(theme)}>
           <Icon className="size-4" aria-hidden />
         </span>
         <span className="mt-1 size-2 rounded-full" style={{ background: theme.accent, boxShadow: `0 0 18px ${theme.accent}` }} />
       </div>
-      <p className="aimura-role-label mt-4 text-xs font-semibold uppercase tracking-[0.18em]">{label}</p>
-      <p className="aimura-role-value mt-2 truncate text-2xl font-semibold tracking-[-0.03em]">{value}</p>
+      <p className="aimura-role-label mt-4 text-xs font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em]">{label}</p>
+      <p className="aimura-role-value mt-2 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{value}</p>
       {detail ? <p className="aimura-role-body mt-2 line-clamp-2 text-sm leading-6">{detail}</p> : null}
     </div>
   );
@@ -137,14 +137,14 @@ export function InsightCard({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[1.15rem] border border-aimura-line/60 bg-aimura-panel/45 p-4 transition hover:border-[var(--accent-border)] hover:bg-white/[0.045]" style={categoryStyle(theme)}>
+    <div className="min-w-0 max-w-full rounded-[1.15rem] border border-aimura-line/60 bg-aimura-panel/45 p-4 transition hover:border-[var(--accent-border)] hover:bg-white/[0.045]" style={categoryStyle(theme)}>
       <div className="flex items-start gap-3">
         <span className="aimura-category-icon size-10 shrink-0 rounded-2xl" style={categoryStyle(theme)}>
           <Icon className="size-4" aria-hidden />
         </span>
         <div className="min-w-0">
           <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.18em]">{label}</p>
-          <h4 className="aimura-role-title mt-2 text-lg font-semibold tracking-[-0.02em]">{title}</h4>
+          <h4 className="aimura-role-title mt-2 break-words text-lg font-semibold tracking-[-0.02em]">{title}</h4>
           <p className="aimura-role-body mt-2 text-sm leading-6">{body}</p>
           {action ? <div className="mt-4">{action}</div> : null}
         </div>
@@ -214,29 +214,31 @@ export function ProgressHeader({
   sections,
   activeIndex,
   completedCount,
+  progressPercent,
   theme,
 }: {
   sections: Array<{ id: string; title: string; tab: string }>;
   activeIndex: number;
   completedCount: number;
+  progressPercent: number;
   theme: CategoryTheme;
 }) {
-  const progress = ((activeIndex + 1) / sections.length) * 100;
+  const progress = Math.max(0, Math.min(100, progressPercent));
   const active = sections[activeIndex];
 
   return (
     <div className="rounded-[1.15rem] border border-aimura-line/70 bg-aimura-panel/45 p-4" style={categoryStyle(theme)}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.2em]">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.14em] sm:tracking-[0.2em]">
             7-step intake
           </p>
-          <h3 className="aimura-role-title mt-2 text-2xl font-semibold tracking-[-0.03em]">{active.title}</h3>
+          <h3 className="aimura-role-title mt-2 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{active.title}</h3>
           <p className="aimura-role-body mt-1 text-sm">
-            Step {activeIndex + 1} of {sections.length} · {completedCount} completed · {Math.round(progress)}%
+            Step {activeIndex + 1} of {sections.length} · {completedCount} completed · {Math.round(progress)}% answered
           </p>
         </div>
-        <div className="aimura-role-value min-w-[10rem] rounded-control border px-4 py-2 text-center text-sm font-semibold" style={{ borderColor: theme.border }}>
+        <div className="aimura-role-value w-full rounded-control border px-4 py-2 text-center text-sm font-semibold sm:w-auto sm:min-w-[10rem]" style={{ borderColor: theme.border }}>
           {active.tab}
         </div>
       </div>
@@ -276,7 +278,7 @@ export function IntakeStepCard({
   helper?: string;
 }) {
   return (
-    <div className="aimura-rise rounded-[1.4rem] border bg-aimura-panel/38 p-4 sm:p-5" style={{ ...categoryStyle(theme), borderColor: theme.border }}>
+    <div className="aimura-rise min-w-0 max-w-full overflow-hidden rounded-[1.4rem] border bg-aimura-panel/38 p-4 sm:p-5" style={{ ...categoryStyle(theme), borderColor: theme.border }}>
       {helper ? <p className="aimura-role-body mb-4 text-sm leading-6">{helper}</p> : null}
       {children}
     </div>
@@ -296,13 +298,13 @@ export function ActionButtonGroup({
   }>;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid gap-2 sm:flex sm:flex-wrap">
       {actions.map((action) => {
         const Icon = action.icon;
         const variant = action.variant ?? "secondary";
         return (
           <button
-            className={`aimura-focus-ring inline-flex items-center justify-center gap-2 rounded-control px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`aimura-focus-ring inline-flex w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-control px-4 py-2.5 text-center text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto ${
               variant === "primary"
                 ? "aimura-green-glow bg-aimura-green text-aimura-black hover:bg-aimura-mint"
                 : variant === "ghost"
@@ -314,8 +316,8 @@ export function ActionButtonGroup({
             onClick={action.onClick}
             type="button"
           >
-            {action.loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : Icon ? <Icon className="size-4" aria-hidden /> : null}
-            {action.label}
+            {action.loading ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : Icon ? <Icon className="size-4 shrink-0" aria-hidden /> : null}
+            <span className="min-w-0 break-words">{action.label}</span>
           </button>
         );
       })}

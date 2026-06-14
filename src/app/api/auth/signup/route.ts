@@ -20,5 +20,19 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 409 });
   }
 
-  return NextResponse.json(result);
+  // Relative path so the link works on whatever host the visitor is on
+  // (a public tunnel, localhost, or a deployed URL) without host guessing.
+  const activationLink = result.activationToken
+    ? `/api/auth/activate?token=${encodeURIComponent(result.activationToken)}`
+    : undefined;
+
+  return NextResponse.json(
+    {
+      success: true,
+      message: result.message,
+      requiresActivation: true,
+      activationLink,
+    },
+    { status: 201 },
+  );
 }

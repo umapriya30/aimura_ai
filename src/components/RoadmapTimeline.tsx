@@ -75,7 +75,7 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
         description="A staged execution timeline with one active phase at a time. Each phase connects weeks, objective, deliverables, skills, evidence, and mentor support."
         icon={ClipboardList}
         meta={
-          <span className="rounded-control border px-4 py-2 text-sm font-semibold" style={{ borderColor: theme.border, color: theme.accent }}>
+          <span className="inline-flex max-w-full break-words rounded-2xl border px-4 py-2 text-sm font-semibold leading-5 sm:rounded-control" style={{ borderColor: theme.border, color: theme.accent }}>
             {donePhases.length}/{phases.length} complete
           </span>
         }
@@ -83,14 +83,14 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
         title="Weekly Plan Timeline"
       />
 
-      <div className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-        <div className="relative space-y-3">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[0.78fr_1.22fr]">
+        <div className="relative min-w-0 space-y-3">
           {phases.map((phase, index) => {
             const active = index === activePhaseIndex;
             const done = donePhases.includes(phase.phase);
             return (
               <button
-                className={`aimura-focus-ring relative flex w-full gap-3 rounded-[1.15rem] border p-4 text-left transition ${
+                className={`aimura-focus-ring relative flex w-full min-w-0 gap-3 overflow-hidden rounded-[1.15rem] border p-4 text-left transition ${
                   active ? "bg-white/[0.075] text-aimura-white" : "bg-white/[0.028] text-aimura-muted hover:bg-white/[0.05] hover:text-aimura-white"
                 }`}
                 key={`${phase.phase}-${phase.timeframe}`}
@@ -112,10 +112,10 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
                   {done ? <CheckCircle2 className="size-4" aria-hidden /> : index + 1}
                 </span>
                 <span className="min-w-0">
-                  <span className={`block text-xs font-semibold uppercase tracking-[0.18em] ${active ? "aimura-role-label" : "aimura-role-subtle"}`}>
+                  <span className={`block text-xs font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em] ${active ? "aimura-role-label" : "aimura-role-subtle"}`}>
                     {phase.weekRange}
                   </span>
-                  <span className="aimura-role-title mt-1 block text-base font-semibold">{phase.phase}</span>
+                  <span className="aimura-role-title mt-1 block break-words text-base font-semibold">{phase.phase}</span>
                   <span className="aimura-role-body mt-1 line-clamp-2 block text-sm leading-6">{phase.focus}</span>
                 </span>
               </button>
@@ -124,7 +124,7 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
         </div>
 
         <div
-          className="aimura-gradient-card rounded-[1.35rem] p-5"
+          className="aimura-gradient-card min-w-0 max-w-full overflow-hidden rounded-[1.35rem] p-4 sm:p-5"
           style={{
             "--accent": theme.accent,
             "--accent-2": theme.accent2,
@@ -132,15 +132,15 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
             "--accent-border": theme.border,
           } as CSSProperties}
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.2em]">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.14em] sm:tracking-[0.2em]">
                 {activePhase.weekRange}
               </p>
-              <h4 className="aimura-role-title mt-2 text-2xl font-semibold tracking-[-0.03em]">{activePhase.phase}</h4>
+              <h4 className="aimura-role-title mt-2 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{activePhase.phase}</h4>
               <p className="aimura-role-body mt-2 text-sm leading-6">{activePhase.focus}</p>
             </div>
-            <span className="aimura-role-value inline-flex items-center gap-2 rounded-control border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: theme.border }}>
+            <span className="aimura-role-value inline-flex max-w-full items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-semibold leading-5 sm:rounded-control" style={{ borderColor: theme.border }}>
               <Target className="size-3.5" aria-hidden />
               {isDone ? "Marked done" : activePhase.cta}
             </span>
@@ -149,7 +149,7 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
           <div className="mt-5 flex flex-wrap gap-2">
             {(["details", "skills", "evidence"] as TimelineTab[]).map((tab) => (
               <button
-                className={`aimura-focus-ring rounded-control px-4 py-2 text-sm font-semibold capitalize transition ${
+                className={`aimura-focus-ring min-w-0 whitespace-normal rounded-control px-4 py-2 text-sm font-semibold capitalize transition ${
                   activeTab === tab ? "text-aimura-black" : "border border-aimura-moss/30 text-aimura-muted hover:text-aimura-white"
                 }`}
                 key={tab}
@@ -162,7 +162,7 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
             ))}
           </div>
 
-          <div className="mt-5 rounded-[1.1rem] border border-white/10 bg-aimura-black/30 p-4">
+          <div className="mt-5 min-w-0 rounded-[1.1rem] border border-white/10 bg-aimura-black/30 p-4">
             {activeTab === "details" ? (
               <TimelineList
                 icon={ClipboardList}
@@ -235,11 +235,11 @@ export function RoadmapTimeline({ report, onAskMentor, onToast }: RoadmapTimelin
         </div>
       </div>
 
-      <div className="rounded-[1.35rem] border p-5" style={{ background: theme.headerGradient, borderColor: theme.border }}>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.2em]">After week 24</p>
-            <h4 className="aimura-role-title mt-2 text-2xl font-semibold tracking-[-0.03em]">
+      <div className="min-w-0 rounded-[1.35rem] border p-4 sm:p-5" style={{ background: theme.headerGradient, borderColor: theme.border }}>
+        <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 max-w-3xl">
+            <p className="aimura-role-label text-xs font-semibold uppercase tracking-[0.14em] sm:tracking-[0.2em]">After week 24</p>
+            <h4 className="aimura-role-title mt-2 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">
               Ask for more guidance and connect with a one-to-one mentor.
             </h4>
             <p className="aimura-role-body mt-2 text-sm leading-6">
@@ -289,13 +289,13 @@ function TimelineList({
   const theme = categoryThemes["weekly-plan"];
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Icon className="size-4" style={{ color: theme.accent }} aria-hidden />
-        <p className="aimura-role-label text-sm font-semibold uppercase tracking-[0.18em]">{title}</p>
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon className="size-4 shrink-0" style={{ color: theme.accent }} aria-hidden />
+        <p className="aimura-role-label min-w-0 break-words text-sm font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em]">{title}</p>
       </div>
       <ul className="mt-4 grid gap-2">
         {values.map((value) => (
-          <li className="aimura-role-body rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6" key={`${title}-${value}`}>
+          <li className="aimura-role-body min-w-0 break-words rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6" key={`${title}-${value}`}>
             {value}
           </li>
         ))}

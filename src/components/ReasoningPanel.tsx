@@ -24,8 +24,8 @@ export function ReasoningPanel({ report }: ReasoningPanelProps) {
     {
       icon: Search,
       title: "Input signals",
-      body: `Read ${report.studentName}'s goal, field, skills, preferred countries, budget, weekly hours, and support needs.`,
-      meta: `${report.answers.helpFocus || "Complete Career Plan"} focus`,
+      body: `Read ${report.studentName}'s goal, field, skills, study intent, preferred countries, budget currency, weekly hours, and support needs.`,
+      meta: `${formatFocus(report.answers.helpFocus)} focus`,
     },
     {
       icon: Network,
@@ -118,4 +118,10 @@ export function ReasoningPanel({ report }: ReasoningPanelProps) {
       )}
     </div>
   );
+}
+
+function formatFocus(focus: string[] | unknown) {
+  if (Array.isArray(focus)) return focus.length ? focus.join(", ") : "Complete Career Plan";
+  if (typeof focus === "string" && focus.trim()) return focus;
+  return "Complete Career Plan";
 }

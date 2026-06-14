@@ -29,8 +29,11 @@ export type StudentAnswers = {
   hasGithub: string;
   hasLinkedin: string;
   careerGap: string;
-  // 5. Study-abroad preferences
+  // 5. Study preferences
+  studyGoal: string;
+  studyLocationIntent: string;
   studyCountries: string[];
+  budgetCurrency: string;
   budgetRange: string;
   needScholarship: string;
   englishTest: string;
@@ -42,8 +45,9 @@ export type StudentAnswers = {
   // 7. Mentorship & networking
   wantMentor: string;
   wantCommunity: string;
+  supportPreference: string;
   // Final trigger
-  helpFocus: string;
+  helpFocus: string[];
 };
 
 export type DomainProfile = {
@@ -138,12 +142,25 @@ export type CareerIntelligence = {
   source: "foundry" | "ai" | "offline";
 };
 
+// Transparent breakdown of how the readiness score was reached, so the student
+// (and judges) can see WHY — not just a number.
+export type ScoreBreakdown = {
+  skills: number; // 0..40 — coverage of the target role's required skills
+  education: number; // 0..26 — how well the field of study fits the role
+  evidence: number; // 0..26 — projects, internship, portfolio
+  interests: number; // 0..8 — add-on only
+  coveragePct: number; // % of required skills evidenced
+  penaltyFactor: number; // 1, 0.82, or 0.6 when study/skills mismatch the role
+  notes: string[]; // human-readable reasons
+};
+
 export type AimuraStudentReport = {
   id: string;
   generatedAt: string;
   studentName: string;
   summary: string;
   skillScore: number;
+  scoreBreakdown?: ScoreBreakdown;
   answers: StudentAnswers;
   domainProfile: DomainProfile;
   intelligence: CareerIntelligence;
@@ -160,6 +177,9 @@ export type AuthResponse = {
   message?: string;
   user?: AuthUser;
   token?: string;
+  requiresActivation?: boolean;
+  activationLink?: string;
+  resetLink?: string;
 };
 
 export type InsightResponse = {

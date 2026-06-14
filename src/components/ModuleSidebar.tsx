@@ -35,9 +35,9 @@ export function ModuleSidebar<Id extends string>({ items, activeId, onChange }: 
 
   return (
     <>
-      <div className="lg:hidden">
+      <div className="w-full min-w-0 max-w-full overflow-hidden lg:hidden">
         <button
-          className="aimura-focus-ring flex w-full items-center justify-between gap-3 rounded-[1.15rem] border border-white/10 bg-aimura-panel/70 p-3 text-left"
+          className="aimura-focus-ring flex w-full min-w-0 max-w-full items-center justify-between gap-3 rounded-[1.15rem] border border-white/10 bg-aimura-panel/70 p-3 text-left"
           onClick={() => setMobileOpen((current) => !current)}
           type="button"
         >
@@ -53,7 +53,7 @@ export function ModuleSidebar<Id extends string>({ items, activeId, onChange }: 
           <ChevronDown className={`size-4 shrink-0 text-aimura-muted transition ${mobileOpen ? "rotate-180" : ""}`} aria-hidden />
         </button>
 
-        <div className="aimura-no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-2">
+        <div className="mt-3 grid min-w-0 max-w-full grid-cols-2 gap-2">
           {items.map((item) => (
             <ModuleButton
               active={item.id === activeId}
@@ -69,7 +69,7 @@ export function ModuleSidebar<Id extends string>({ items, activeId, onChange }: 
         </div>
 
         {mobileOpen ? (
-          <div className="aimura-glass mt-3 grid gap-2 rounded-[1.15rem] p-2">
+          <div className="aimura-glass mt-3 grid w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-[1.15rem] p-2">
             {items.map((item) => (
               <ModuleButton
                 active={item.id === activeId}
@@ -85,7 +85,7 @@ export function ModuleSidebar<Id extends string>({ items, activeId, onChange }: 
         ) : null}
       </div>
 
-      <aside className="aimura-glass sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-[1.35rem] p-3 lg:block">
+      <aside className="aimura-glass sticky top-24 hidden max-h-[calc(100vh-7rem)] min-w-0 max-w-full overflow-y-auto rounded-[1.35rem] p-3 lg:block">
         <div className="mb-3 flex items-center gap-2 px-2 pt-1">
           <span className="inline-flex size-8 items-center justify-center rounded-xl border border-aimura-green/30 bg-aimura-green/10 text-aimura-green">
             <Sparkles className="size-4" aria-hidden />
@@ -120,8 +120,8 @@ function ModuleButton<Id extends string>({
 
   return (
     <button
-      className={`aimura-focus-ring group relative min-w-0 rounded-[1rem] border text-left transition duration-200 ${
-        compact ? "shrink-0 px-3 py-2" : "w-full p-3"
+      className={`aimura-focus-ring group relative min-w-0 max-w-full overflow-hidden rounded-[1rem] border text-left transition duration-200 ${
+        compact ? "w-full px-3 py-2" : "w-full p-3"
       } ${
         active
           ? "bg-white/[0.07] text-aimura-white"
@@ -136,15 +136,15 @@ function ModuleButton<Id extends string>({
       }}
       type="button"
     >
-      <div className={`flex items-center gap-3 ${compact ? "" : "items-start"}`}>
+      <div className={`flex min-w-0 items-center gap-3 ${compact ? "" : "items-start"}`}>
         <span className={`${compact ? "size-8 rounded-xl" : "size-10 rounded-2xl"} aimura-category-icon shrink-0`} style={categoryStyle(item.theme)}>
           <Icon className={compact ? "size-3.5" : "size-4"} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className={`aimura-role-title truncate font-semibold ${compact ? "text-xs" : "text-sm"}`}>{item.label}</span>
+            <span className={`aimura-role-title min-w-0 flex-1 break-words font-semibold ${compact ? "text-xs leading-4" : "text-sm"}`}>{item.label}</span>
             {!compact ? (
-              <span className="aimura-role-value ml-auto inline-flex items-center gap-1 rounded-control border px-2 py-0.5 text-[0.62rem] font-semibold" style={{ borderColor: item.theme.border }}>
+              <span className="aimura-role-value ml-auto inline-flex shrink-0 items-center gap-1 rounded-control border px-2 py-0.5 text-[0.62rem] font-semibold" style={{ borderColor: item.theme.border }}>
                 {item.status === "done" ? <CheckCircle2 className="size-3" aria-hidden /> : <Circle className="size-2 fill-current" aria-hidden />}
                 {statusLabel[item.status]}
               </span>

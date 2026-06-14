@@ -6,6 +6,7 @@ import {
   BrainCircuit,
   BriefcaseBusiness,
   CalendarClock,
+  CheckCircle2,
   ExternalLink,
   GraduationCap,
   Gauge,
@@ -48,6 +49,8 @@ type ReportDashboardProps = {
   isGenerated: boolean;
   report: AimuraStudentReport | null;
   onActivity?: (message: string) => void;
+  // Incremented by the floating mentor button to force-open the mentor section.
+  openMentorSignal?: number;
 };
 
 type GeneratedSectionId = "overview" | "career" | "learning" | "portfolio" | "universities" | "roadmap" | "mentor";
@@ -77,18 +80,61 @@ const emptyStateModules = [
   { title: "Mentor", description: "A live mentor chat that answers using your generated plan, not a generic script." },
 ];
 
-// Map the student's stated focus to the most relevant section, so the answer
-// they gave in the intake actually changes what they see first.
-function focusToSection(focus: string): GeneratedSectionId {
-  const map: Record<string, GeneratedSectionId> = {
-    "University Recommendations": "universities",
-    "Admission Strategy": "universities",
-    "Course Suggestions": "learning",
-    "Skill Gap Analysis": "career",
-    "Study Roadmap": "roadmap",
-    "Complete Career Plan": "overview",
+function focusValues(report: AimuraStudentReport) {
+  const raw = report.answers.helpFocus as unknown;
+  if (Array.isArray(raw)) return raw.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  if (typeof raw === "string" && raw.trim()) return [raw.trim()];
+  return [];
+}
+
+function formatFocus(report: AimuraStudentReport) {
+  const values = focusValues(report);
+  return values.length ? values.join(", ") : "Complete Career Plan";
+}
+
+function wantsFormalStudy(report: AimuraStudentReport) {
+  const text = `${report.answers.studyGoal} ${report.answers.studyLocationIntent}`.toLowerCase();
+  return !/(do not|don't|dont|not planning formal study)/i.test(text);
+}
+
+// Map the student's stated focus to the most relevant modules, so the answer
+// they gave in the intake changes what the report actually shows.
+function sectionsForReport(report: AimuraStudentReport) {
+  const focus = focusValues(report);
+  const formalStudy = wantsFormalStudy(report);
+  const allAllowedSections = formalStudy
+    ? generatedSections
+    : generatedSections.filter((section) => section.id !== "universities");
+  if (!focus.length || focus.includes("Complete Career Plan")) return allAllowedSections;
+
+  const ids = new Set<GeneratedSectionId>();
+  const map: Record<string, GeneratedSectionId[]> = {
+    "University Recommendations": ["universities"],
+    "Admission Strategy": ["universities"],
+    "Course Suggestions": ["learning"],
+    "Skill Gap Analysis": ["career"],
+    "Study Roadmap": ["roadmap"],
+    "Portfolio / Project Proof": ["portfolio"],
+    "Interview Preparation": ["roadmap", "portfolio"],
+    "AI Mentor Coaching": ["mentor"],
   };
-  return map[focus] || "overview";
+
+  focus.forEach((item) => map[item]?.forEach((id) => ids.add(id)));
+  if (!formalStudy) {
+    ids.delete("universities");
+    ids.add("portfolio");
+    ids.add("roadmap");
+    if (report.answers.supportPreference !== "No help right now") ids.add("mentor");
+  }
+  if (report.answers.supportPreference === "No help right now") ids.delete("mentor");
+
+  const filtered = allAllowedSections.filter((section) => ids.has(section.id));
+  return filtered.length ? filtered : allAllowedSections.filter((section) => section.id === "overview");
+}
+
+function firstSectionForReport(report: AimuraStudentReport): GeneratedSectionId {
+  if (!wantsFormalStudy(report) && report.answers.supportPreference !== "No help right now") return "mentor";
+  return sectionsForReport(report)[0]?.id || "overview";
 }
 
 function getRoadmapTotalWeeks(report: AimuraStudentReport) {
@@ -104,10 +150,28 @@ function compactList(values: string[], fallback: string) {
   return values.length ? values.slice(0, 3).join(", ") : fallback;
 }
 
-export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashboardProps) {
+export function ReportDashboard({ isGenerated, report, onActivity, openMentorSignal = 0 }: ReportDashboardProps) {
   const [activeGeneratedSection, setActiveGeneratedSection] = useState<GeneratedSectionId>("overview");
   const [toast, setToast] = useState<ToastState | null>(null);
-  const activeGeneratedNavItem = generatedSections.find((item) => item.id === activeGeneratedSection);
+  const [forceMentor, setForceMentor] = useState(false);
+
+  // The floating "Ask AI Mentor" button bumps openMentorSignal; honor it by
+  // making the mentor reachable and selecting it, even if focus filtering hid it.
+  useEffect(() => {
+    if (openMentorSignal > 0) {
+      setForceMentor(true);
+      setActiveGeneratedSection("mentor");
+    }
+  }, [openMentorSignal]);
+
+  const baseSections = report ? sectionsForReport(report) : generatedSections;
+  const visibleSections = forceMentor && !baseSections.some((s) => s.id === "mentor")
+    ? [...baseSections, generatedSections.find((s) => s.id === "mentor")!]
+    : baseSections;
+  const renderedActiveSection = visibleSections.some((item) => item.id === activeGeneratedSection)
+    ? activeGeneratedSection
+    : visibleSections[0]?.id || "overview";
+  const activeGeneratedNavItem = visibleSections.find((item) => item.id === renderedActiveSection);
   const activeTheme = categoryThemes[activeGeneratedNavItem?.category || "my-plan"];
 
   function showToast(tone: ToastState["tone"], title: string, message?: string) {
@@ -117,23 +181,24 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
 
   // When a new report arrives, open the section matching the student's focus.
   const reportId = report?.id;
-  const focus = report?.answers.helpFocus;
+  const focus = report ? focusValues(report).join("|") : "";
   useEffect(() => {
-    if (reportId && focus) setActiveGeneratedSection(focusToSection(focus));
-  }, [reportId, focus]);
+    if (report) setActiveGeneratedSection(firstSectionForReport(report));
+  }, [report, reportId, focus]);
 
   if (report) {
     const totalWeeks = getRoadmapTotalWeeks(report);
     const targetRole = report.domainProfile.targetRoles[0] || report.answers.dreamRole || "Target role";
     const nextAction = report.roadmap[0]?.actions[0] || report.intelligence.detailedTimetable[0]?.tasks[0] || "Ask the mentor for your first move.";
     const topGaps = compactList(report.domainProfile.missingSkills, "No major gaps found");
-    const moduleItems: Array<ModuleNavItem<GeneratedSectionId>> = generatedSections.map((item) => ({
+    const focusedReport = visibleSections.length < generatedSections.length && !focusValues(report).includes("Complete Career Plan");
+    const moduleItems: Array<ModuleNavItem<GeneratedSectionId>> = visibleSections.map((item) => ({
       id: item.id,
       label: item.label,
       description: item.description,
       icon: item.icon,
       theme: categoryThemes[item.category],
-      status: activeGeneratedSection === item.id ? "active" : item.id === "overview" ? "done" : "ready",
+      status: renderedActiveSection === item.id ? "active" : item.id === "overview" ? "done" : "ready",
       completion:
         item.id === "overview"
           ? 100
@@ -147,23 +212,23 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
     }));
 
     return (
-      <section className="mx-auto max-w-7xl scroll-mt-8 px-5 py-12 sm:px-8 lg:px-12" id="report">
-        <GradientCard className="mb-6 p-5 sm:p-6" theme={categoryThemes["my-plan"]}>
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
-            <div className="max-w-3xl">
-              <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-[0.28em] text-aimura-green">
+      <section className="mx-auto w-full max-w-7xl scroll-mt-8 px-4 py-10 sm:px-8 sm:py-12 lg:px-12" id="report">
+        <GradientCard className="mb-6 w-full overflow-hidden p-4 sm:p-6" theme={categoryThemes["my-plan"]}>
+          <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-start">
+            <div className="min-w-0 max-w-3xl">
+              <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-[0.14em] text-aimura-green sm:tracking-[0.28em]">
                 <Sparkles className="size-4" aria-hidden />
-                Success state
+                {focusedReport ? "Selected results" : "Success state"}
               </p>
-              <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-aimura-white sm:text-5xl">
-                {report.studentName}, your roadmap is live.
+              <h2 className="mt-4 break-words text-3xl font-semibold tracking-[-0.04em] text-aimura-white sm:text-5xl">
+                {report.studentName}, {focusedReport ? "your focused results are live." : "your roadmap is live."}
               </h2>
               <p className="mt-5 text-base leading-7 text-aimura-muted">{report.summary}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-aimura-muted">
-                <span className="rounded-control border border-aimura-moss/30 px-3 py-1.5">
+                <span className="max-w-full break-words rounded-2xl border border-aimura-moss/30 px-3 py-1.5 sm:rounded-control">
                   Saved locally / {new Date(report.generatedAt).toLocaleString()}
                 </span>
-                <span className="rounded-control border border-aimura-green/30 bg-aimura-green/10 px-3 py-1.5 text-aimura-green">
+                <span className="max-w-full break-words rounded-2xl border border-aimura-green/30 bg-aimura-green/10 px-3 py-1.5 text-aimura-green sm:rounded-control">
                   {report.intelligence.source === "foundry" ? "Foundry IQ active" : "Resilient reasoning active"}
                 </span>
               </div>
@@ -172,11 +237,12 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
               activeSectionLabel={activeGeneratedNavItem?.label}
               isGenerated={isGenerated}
               onActivity={onActivity}
+              report={report}
               reportTitle={`${report.studentName}'s Aimura AI pathway report`}
             />
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-6 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <MetricCard
               detail={`${report.domainProfile.normalizedField} readiness`}
               icon={Gauge}
@@ -215,9 +281,9 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
           </div>
         </GradientCard>
 
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[300px_1fr]">
+        <div className="grid w-full min-w-0 max-w-full gap-6 lg:grid-cols-[300px_1fr]">
           <ModuleSidebar
-            activeId={activeGeneratedSection}
+            activeId={renderedActiveSection}
             items={moduleItems}
             onChange={(id) => {
               setActiveGeneratedSection(id);
@@ -225,12 +291,12 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
             }}
           />
 
-          <GradientCard className="aimura-no-left-line min-w-0 p-5 sm:p-6" style={{ borderLeftColor: "transparent" }} theme={activeTheme}>
+          <GradientCard className="aimura-no-left-line w-full min-w-0 max-w-full overflow-hidden p-4 sm:p-6" style={{ borderLeftColor: "transparent" }} theme={activeTheme}>
             <SectionHeader
               description={activeGeneratedNavItem?.description}
               icon={activeGeneratedNavItem?.icon}
               meta={
-                <span className="rounded-control border px-4 py-2 text-sm font-semibold" style={{ borderColor: activeTheme.border, color: activeTheme.accent }}>
+                <span className="inline-flex max-w-full break-words rounded-2xl border px-4 py-2 text-sm font-semibold leading-5 sm:rounded-control" style={{ borderColor: activeTheme.border, color: activeTheme.accent }}>
                   Skill score {report.skillScore}/100
                 </span>
               }
@@ -239,25 +305,25 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
             />
 
             <div className="mt-6">
-              {activeGeneratedSection === "overview" ? (
+              {renderedActiveSection === "overview" ? (
                 <GeneratedOverview
                   onAskMentor={() => setActiveGeneratedSection("mentor")}
                   onContinueWeeklyPlan={() => setActiveGeneratedSection("roadmap")}
                   report={report}
                 />
               ) : null}
-              {activeGeneratedSection === "career" ? <CareerIntelligence report={report} /> : null}
-              {activeGeneratedSection === "learning" ? <LiveLearningHub resources={report.learningResources} /> : null}
-              {activeGeneratedSection === "portfolio" ? <PortfolioBuilder portfolio={report.portfolioPlan} /> : null}
-              {activeGeneratedSection === "universities" ? <UniversityMatches report={report} /> : null}
-              {activeGeneratedSection === "roadmap" ? (
+              {renderedActiveSection === "career" ? <CareerIntelligence report={report} /> : null}
+              {renderedActiveSection === "learning" ? <LiveLearningHub resources={report.learningResources} /> : null}
+              {renderedActiveSection === "portfolio" ? <PortfolioBuilder portfolio={report.portfolioPlan} /> : null}
+              {renderedActiveSection === "universities" ? <UniversityMatches report={report} /> : null}
+              {renderedActiveSection === "roadmap" ? (
                 <RoadmapTimeline
                   onAskMentor={() => setActiveGeneratedSection("mentor")}
                   onToast={(nextToast) => showToast(nextToast.tone, nextToast.title, nextToast.message)}
                   report={report}
                 />
               ) : null}
-              {activeGeneratedSection === "mentor" ? <MentorChat report={report} /> : null}
+              {renderedActiveSection === "mentor" ? <MentorChat report={report} /> : null}
             </div>
 
             <div className="aimura-role-body mt-6 rounded-[1.15rem] border bg-aimura-panel/45 p-4 text-sm leading-6" style={{ ...categoryStyle(activeTheme), borderColor: activeTheme.border }}>
@@ -272,16 +338,16 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
   }
 
   return (
-    <section className="mx-auto max-w-7xl scroll-mt-8 px-5 py-12 sm:px-8 lg:px-12" id="report">
-      <GradientCard className="p-5 sm:p-6">
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+      <section className="mx-auto w-full max-w-7xl scroll-mt-8 px-4 py-10 sm:px-8 sm:py-12 lg:px-12" id="report">
+      <GradientCard className="w-full overflow-hidden p-4 sm:p-6">
+        <div className="flex min-w-0 flex-col justify-between gap-5 lg:flex-row lg:items-start">
           <EmptyState
             description="Complete the guided intake and Aimura AI will generate a saved report from your real answers, including career intelligence with risk and fallback strategy."
             icon={Sparkles}
             title="No report generated yet."
           />
-          <div className="shrink-0">
-            <span className="mb-4 inline-flex rounded-control border border-aimura-moss/35 bg-aimura-panel px-4 py-2 text-sm text-aimura-muted">
+          <div className="min-w-0 shrink-0">
+            <span className="mb-4 inline-flex max-w-full break-words rounded-2xl border border-aimura-moss/35 bg-aimura-panel px-4 py-2 text-sm text-aimura-muted sm:rounded-control">
               Waiting for intake
             </span>
             <ExportActions activeSectionLabel="Not generated yet" isGenerated={isGenerated} onActivity={onActivity} />
@@ -293,7 +359,7 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
             description="A premium preview of the modules that unlock after generation."
             icon={Route}
             meta={
-              <span className="rounded-control bg-aimura-green/10 px-4 py-2 text-sm font-medium text-aimura-green">
+              <span className="inline-flex max-w-full break-words rounded-2xl bg-aimura-green/10 px-4 py-2 text-sm font-medium text-aimura-green sm:rounded-control">
                 {emptyStateModules.length} modules
               </span>
             }
@@ -302,7 +368,7 @@ export function ReportDashboard({ isGenerated, report, onActivity }: ReportDashb
           />
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {emptyStateModules.map((module, index) => {
             const section = generatedSections[index] || generatedSections[0];
             const theme = categoryThemes[section.category];
@@ -344,53 +410,144 @@ function GeneratedOverview({
     report.answers.studyCountries.length > 0
       ? report.answers.studyCountries.join(", ")
       : report.answers.country || "Not selected yet";
+  const noHelp = report.answers.supportPreference === "No help right now";
+
+  // Interactive journey progress: starts at 0% and climbs as the student marks
+  // stages complete. Persisted per report so it survives reloads.
+  const journey = roadmapToJourney(report);
+  const totalStages = journey.segments.length;
+  const [completedStages, setCompletedStages] = useState(0);
+  useEffect(() => {
+    try {
+      const saved = Number(window.localStorage.getItem(`aimura_progress_${report.id}`));
+      if (Number.isFinite(saved)) setCompletedStages(Math.max(0, Math.min(totalStages, saved)));
+    } catch {
+      /* ignore */
+    }
+  }, [report.id, totalStages]);
+  const setProgress = (next: number) => {
+    const clamped = Math.max(0, Math.min(totalStages, next));
+    setCompletedStages(clamped);
+    try {
+      window.localStorage.setItem(`aimura_progress_${report.id}`, String(clamped));
+    } catch {
+      /* ignore */
+    }
+  };
+  const currentStageLabel = completedStages > 0 ? journey.segments[completedStages - 1].label : "Not started";
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[1.35rem] border p-5" style={{ ...categoryStyle(categoryThemes["my-plan"]), background: categoryThemes["my-plan"].soft, borderColor: categoryThemes["my-plan"].border }}>
-          <p className="aimura-role-label text-xs uppercase tracking-[0.2em]">Your direction</p>
-          <h4 className="aimura-role-title mt-3 text-2xl font-semibold tracking-[-0.03em]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="min-w-0 rounded-[1.35rem] border p-4 sm:p-5" style={{ ...categoryStyle(categoryThemes["my-plan"]), background: categoryThemes["my-plan"].soft, borderColor: categoryThemes["my-plan"].border }}>
+          <p className="aimura-role-label text-xs uppercase tracking-[0.14em] sm:tracking-[0.2em]">Your direction</p>
+          <h4 className="aimura-role-title mt-3 break-words text-xl font-semibold tracking-[-0.03em] sm:text-2xl">
             {report.domainProfile.targetRoles[0]} through {report.domainProfile.normalizedField}
           </h4>
           <p className="aimura-role-body mt-3 text-sm leading-7">
             This plan is curated around your stated goal, current studies, interests, evidence, budget, and preferred countries.
           </p>
-          {report.answers.helpFocus ? (
-            <p className="aimura-role-value mt-3 inline-flex rounded-control bg-aimura-green/15 px-3 py-1.5 text-xs font-medium">
-              Focus requested: {report.answers.helpFocus}
+          {focusValues(report).length ? (
+            <p className="aimura-role-value mt-3 inline-flex max-w-full break-words rounded-2xl bg-aimura-green/15 px-3 py-1.5 text-xs font-medium leading-5 sm:rounded-control">
+              Focus requested: {formatFocus(report)}
+            </p>
+          ) : null}
+          {noHelp ? (
+            <p className="aimura-role-body mt-3 rounded-2xl border border-aimura-green/25 bg-aimura-green/10 p-3 text-sm leading-6">
+              You chose not to receive active help right now. That is okay — Aimura will keep this profile ready, and we are here whenever your mind changes.
             </p>
           ) : null}
           <div className="mt-5">
             <ActionButtonGroup
               actions={[
                 { label: "Continue Weekly Plan", icon: CalendarClock, onClick: onContinueWeeklyPlan, variant: "primary" },
-                { label: "Ask AI Mentor", icon: MessageSquare, onClick: onAskMentor },
+                ...(noHelp ? [] : [{ label: "Ask AI Mentor", icon: MessageSquare, onClick: onAskMentor }]),
               ]}
             />
           </div>
         </div>
 
-        <div className="rounded-[1.35rem] border bg-aimura-panel/45 p-5" style={{ ...categoryStyle(categoryThemes["my-plan"]), borderColor: categoryThemes["my-plan"].border }}>
+        <div className="min-w-0 rounded-[1.35rem] border bg-aimura-panel/45 p-4 sm:p-5" style={{ ...categoryStyle(categoryThemes["my-plan"]), borderColor: categoryThemes["my-plan"].border }}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="aimura-role-label text-sm font-semibold uppercase tracking-[0.18em]">Career journey chart</p>
-            <span className="aimura-role-value rounded-control bg-aimura-green/10 px-3 py-1 text-xs font-medium">
-              {report.domainProfile.targetRoles[0]}
+            <p className="aimura-role-label text-sm font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em]">Career journey chart</p>
+            <span className="aimura-role-value max-w-full break-words rounded-2xl bg-aimura-green/10 px-3 py-1 text-xs font-medium sm:rounded-control">
+              {completedStages} / {totalStages} stages · {currentStageLabel}
             </span>
           </div>
-          {(() => {
-            const journey = roadmapToJourney(report);
-            return (
-              <JourneyChart
-                segments={journey.segments}
-                centerLabel={journey.centerLabel}
-                centerSub={journey.centerSub}
-                caption={`From today to job-ready: interview readiness reaches 90%, and the final job-ready outcome reaches 100% for ${report.domainProfile.targetRoles[0]}.`}
-              />
-            );
-          })()}
+          <JourneyChart
+            segments={journey.segments}
+            completedCount={completedStages}
+            layout="stacked"
+            caption={`Your journey starts at 0% and climbs as you complete each stage — interview readiness reaches 90%, and landing the role hits 100% for ${report.domainProfile.targetRoles[0]}. Mark stages done as you go.`}
+          />
+          <div className="mt-5 grid min-w-0 gap-2 border-t border-white/10 pt-4 sm:flex sm:flex-wrap sm:items-center">
+            <button
+              className="aimura-focus-ring inline-flex w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-control bg-aimura-green px-4 py-2 text-center text-sm font-semibold text-aimura-black transition hover:bg-aimura-mint disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              disabled={completedStages >= totalStages}
+              onClick={() => setProgress(completedStages + 1)}
+              type="button"
+            >
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+              <span className="min-w-0 break-words">{completedStages >= totalStages ? "All stages complete" : `Mark "${journey.segments[completedStages].label}" done`}</span>
+            </button>
+            <button
+              className="aimura-focus-ring inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-control border border-aimura-moss/50 px-4 py-2 text-sm font-semibold text-aimura-white transition enabled:hover:border-aimura-green disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              disabled={completedStages === 0}
+              onClick={() => setProgress(completedStages - 1)}
+              type="button"
+            >
+              Undo
+            </button>
+            {completedStages > 0 ? (
+              <button
+                className="aimura-focus-ring w-full rounded-control px-3 py-2 text-xs font-medium text-aimura-moss transition hover:text-aimura-white sm:w-auto"
+                onClick={() => setProgress(0)}
+                type="button"
+              >
+                Reset
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {report.scoreBreakdown ? (
+        <div className="rounded-[1.35rem] border bg-aimura-panel/45 p-5" style={{ ...categoryStyle(categoryThemes["career-fit"]), borderColor: categoryThemes["career-fit"].border }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="aimura-role-label text-sm font-semibold uppercase tracking-[0.18em]">Why this readiness score</p>
+            <span className="aimura-role-value rounded-control bg-white/10 px-3 py-1 text-xs font-semibold">{report.skillScore}/100</span>
+          </div>
+          <p className="aimura-role-body mt-2 text-sm leading-6">
+            An honest score, driven by your skills and education linked to {report.domainProfile.targetRoles[0]} — interests are only a small add-on, and a mismatch lowers it on purpose.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Skills match the role", value: report.scoreBreakdown.skills, max: 40, color: categoryThemes["my-plan"].accent },
+              { label: "Education fit", value: report.scoreBreakdown.education, max: 26, color: categoryThemes["career-fit"].accent },
+              { label: "Experience & proof", value: report.scoreBreakdown.evidence, max: 26, color: categoryThemes["build-proof"].accent },
+              { label: "Interests (add-on)", value: report.scoreBreakdown.interests, max: 8, color: categoryThemes["learn"].accent },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="aimura-role-body">{row.label}</span>
+                  <span className="font-semibold" style={{ color: row.color }}>{row.value}/{row.max}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/8">
+                  <div className="h-full rounded-full" style={{ width: `${Math.round((row.value / row.max) * 100)}%`, background: row.color }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <ul className="mt-4 space-y-1.5">
+            {report.scoreBreakdown.notes.map((note) => (
+              <li key={note} className="aimura-role-body flex gap-2 text-sm leading-6">
+                <span className="text-aimura-green">&rsaquo;</span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <InsightCard
@@ -416,10 +573,14 @@ function GeneratedOverview({
         />
         <InsightCard
           icon={GraduationCap}
-          label="Study context"
+          label={wantsFormalStudy(report) ? "Study context" : "Flexible path"}
           theme={categoryThemes["study-options"]}
-          title={preferredCountries}
-          body={`Budget (GBP): ${report.answers.budgetRange || "not specified"} · Scholarship support: ${report.answers.needScholarship || "not specified"} · English test: ${report.answers.englishTest || "not specified"}${report.answers.englishScore ? ` (${report.answers.englishScore})` : ""}`}
+          title={wantsFormalStudy(report) ? preferredCountries : "No formal study selected"}
+          body={
+            wantsFormalStudy(report)
+              ? `Study goal: ${report.answers.studyGoal || "not specified"} · Budget (${report.answers.budgetCurrency || "selected currency"}): ${report.answers.budgetRange || "not specified"} · Scholarship support: ${report.answers.needScholarship || "not specified"} · English test: ${report.answers.englishTest || "not specified"}${report.answers.englishScore ? ` (${report.answers.englishScore})` : ""}`
+              : "Aimura will focus on coaching, proof-building, flexible routes, and a positive check-in if you ever decide to revisit study later."
+          }
         />
       </div>
 
@@ -436,7 +597,9 @@ function reasoningSteps(report: AimuraStudentReport): string[] {
     `Gathered live public signals (${profile.sources.join(", ")}) to ground the required skills.`,
     `Scored your profile honestly at ${report.skillScore}/100 and surfaced gaps: ${profile.missingSkills.slice(0, 3).join(", ")}.`,
     `Reasoned with Foundry IQ to build career intelligence — job market, risk strategy, fallback options, and a 12-week timetable.`,
-    `Assembled your staged roadmap, portfolio plan, and ${report.universityMatches.length} university matches for ${report.answers.studyCountries[0] || report.answers.country || "your region"}.`,
+    wantsFormalStudy(report)
+      ? `Assembled your staged roadmap, portfolio plan, and ${report.universityMatches.length} university matches for ${report.answers.studyCountries[0] || report.answers.country || "your region"}.`
+      : "Built a non-degree coaching path with proof-building, flexible route options, and a mentor check-in instead of forcing university recommendations.",
     `Stood up a live mentor that answers follow-ups using every field above.`,
   ];
 }
@@ -557,6 +720,16 @@ function CareerIntelligence({ report }: { report: AimuraStudentReport }) {
 
 function UniversityMatches({ report }: { report: AimuraStudentReport }) {
   const theme = categoryThemes["study-options"];
+  if (!report.universityMatches.length) {
+    return (
+      <EmptyState
+        description="You did not choose a formal study path right now, so Aimura is keeping university recommendations out of the way. Use the mentor or portfolio plan for flexible next steps."
+        icon={GraduationCap}
+        title="No university shortlist needed yet"
+      />
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {report.universityMatches.map((match) => (

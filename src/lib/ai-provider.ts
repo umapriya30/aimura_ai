@@ -19,22 +19,53 @@ export type MentorStream = {
   engine: MentorEngine;
 };
 
+export type ProviderFailure = {
+  engine: MentorEngine;
+  message: string;
+};
+
+export type MentorReplyResult = {
+  stream: MentorStream | null;
+  configured: MentorEngine[];
+  failures: ProviderFailure[];
+};
+
 const ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 
-const ANTHROPIC_MODEL = process.env.AIMURA_PRIMARY_MODEL || "claude-haiku-4-5-20251001";
+const ANTHROPIC_MODEL = process.env.AIMURA_PRIMARY_MODEL || process.env.ANTHROPIC_MODEL || "";
 const OPENAI_MODEL =
   process.env.AIMURA_BACKUP_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 const MAX_TOKENS = 700;
 const TEMPERATURE = 0.6;
 
+function firstEnv(...names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function azureOpenAiKey() {
+  return firstEnv("AZURE_OPENAI_KEY", "AZURE_OPENAI_API_KEY");
+}
+
+function azureOpenAiEndpoint() {
+  return firstEnv("AZURE_OPENAI_ENDPOINT", "AZURE_ENDPOINT");
+}
+
+function azureDeploymentName() {
+  return firstEnv("AZURE_DEPLOYMENT_NAME", "AZURE_OPENAI_DEPLOYMENT_NAME", "AZURE_OPENAI_DEPLOYMENT");
+}
+
+function azureApiVersion() {
+  return firstEnv("AZURE_OPENAI_API_VERSION", "AZURE_API_VERSION") || "2024-10-21";
+}
+
 export function hasFoundryProvider() {
-  return Boolean(
-    process.env.AZURE_OPENAI_ENDPOINT &&
-      process.env.AZURE_OPENAI_KEY &&
-      process.env.AZURE_DEPLOYMENT_NAME,
-  );
+  return Boolean(azureOpenAiEndpoint() && azureOpenAiKey() && azureDeploymentName());
 }
 
 export function hasOpenAiProvider() {
@@ -42,7 +73,7 @@ export function hasOpenAiProvider() {
 }
 
 export function hasAnthropicProvider() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.ANTHROPIC_API_KEY && ANTHROPIC_MODEL);
 }
 
 export function hasAnyProvider() {
@@ -50,10 +81,28 @@ export function hasAnyProvider() {
 }
 
 function foundryUrl() {
-  const endpoint = (process.env.AZURE_OPENAI_ENDPOINT ?? "").replace(/\/$/, "");
-  const deployment = process.env.AZURE_DEPLOYMENT_NAME ?? "";
-  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-10-21";
+  const endpoint = azureOpenAiEndpoint().replace(/\/$/, "");
+  const deployment = azureDeploymentName();
+  const apiVersion = azureApiVersion();
   return `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+}
+
+function configuredProviders(): MentorEngine[] {
+  const configured: MentorEngine[] = [];
+  if (hasFoundryProvider()) configured.push("foundry");
+  if (hasAnthropicProvider()) configured.push("anthropic");
+  if (hasOpenAiProvider()) configured.push("openai");
+  return configured;
+}
+
+function safeFailureMessage(error: unknown) {
+  let message = error instanceof Error ? error.message : String(error);
+  for (const secret of [azureOpenAiKey(), process.env.OPENAI_API_KEY, process.env.ANTHROPIC_API_KEY]) {
+    if (secret) message = message.replaceAll(secret, "[redacted]");
+  }
+  return message
+    .replace(/\s+/g, " ")
+    .slice(0, 240);
 }
 
 // Reads a Server-Sent-Events body and yields each parsed `data:` JSON payload.
@@ -136,7 +185,7 @@ async function* streamChatCompletions(
 function streamFoundry(system: string, messages: ChatMessage[]) {
   return streamChatCompletions(
     foundryUrl(),
-    { "api-key": process.env.AZURE_OPENAI_KEY ?? "" },
+    { "api-key": azureOpenAiKey() },
     undefined,
     system,
     messages,
@@ -252,7 +301,7 @@ export async function completeText(
   if (hasFoundryProvider()) {
     attempts.push({
       engine: "foundry",
-      run: () => completeChatCompletions(foundryUrl(), { "api-key": process.env.AZURE_OPENAI_KEY ?? "" }, undefined, system, user),
+      run: () => completeChatCompletions(foundryUrl(), { "api-key": azureOpenAiKey() }, undefined, system, user),
     });
   }
   if (hasAnthropicProvider()) {
@@ -282,7 +331,8 @@ export async function completeText(
 export async function streamMentorReply(
   system: string,
   messages: ChatMessage[],
-): Promise<MentorStream | null> {
+): Promise<MentorReplyResult> {
+  const failures: ProviderFailure[] = [];
   for (const attempt of buildStreamAttempts(system, messages)) {
     try {
       const generator = attempt.make();
@@ -295,11 +345,16 @@ export async function streamMentorReply(
         yield* generator;
       }
 
-      return { generator: combined(), engine: attempt.engine };
-    } catch {
+      return {
+        stream: { generator: combined(), engine: attempt.engine },
+        configured: configuredProviders(),
+        failures,
+      };
+    } catch (error) {
+      failures.push({ engine: attempt.engine, message: safeFailureMessage(error) });
       // Move on to the next provider in the chain.
     }
   }
 
-  return null;
+  return { stream: null, configured: configuredProviders(), failures };
 }

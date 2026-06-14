@@ -31,7 +31,7 @@ class AzureFoundryConfig:
         _load_dotenv_if_available()
         return cls(
             endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "").strip(),
-            api_key=os.getenv("AZURE_OPENAI_KEY", "").strip(),
+            api_key=(os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_OPENAI_API_KEY") or "").strip(),
             deployment_name=os.getenv("AZURE_DEPLOYMENT_NAME", "").strip(),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", DEFAULT_API_VERSION).strip()
             or DEFAULT_API_VERSION,

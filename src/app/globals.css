@@ -26,6 +26,8 @@
 
 html {
   scroll-behavior: smooth;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -38,6 +40,8 @@ body {
   background-attachment: fixed;
   color: var(--color-aimura-white);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  max-width: 100%;
+  overflow-x: hidden;
   text-rendering: geometricPrecision;
 }
 
@@ -45,8 +49,22 @@ body {
   box-sizing: border-box;
 }
 
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
 ::selection {
-  background: rgb(44 230 161 / 0.32);
+  background: rgb(148 163 184 / 0.40);
   color: #ffffff;
 }
 
@@ -138,6 +156,15 @@ body {
   color: var(--accent-meta, var(--accent-2, #86f6c9));
 }
 
+.aimura-role-label,
+.aimura-role-title,
+.aimura-role-value,
+.aimura-role-body,
+.aimura-role-subtle,
+.aimura-role-meta {
+  overflow-wrap: anywhere;
+}
+
 .aimura-accent-bg {
   background: linear-gradient(135deg, var(--accent, #2ce6a1), var(--accent-2, #38d8ff));
 }
@@ -160,7 +187,17 @@ body {
 }
 
 .aimura-focus-ring:focus-visible {
-  outline-color: #2ce6a1;
+  outline-color: rgb(148 163 184 / 0.62);
+  box-shadow: 0 0 0 4px rgb(148 163 184 / 0.12);
+}
+
+input:-webkit-autofill,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #102b49 inset !important;
+  -webkit-text-fill-color: #f7fbff !important;
+  caret-color: #f7fbff;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 @keyframes aimura-rise {

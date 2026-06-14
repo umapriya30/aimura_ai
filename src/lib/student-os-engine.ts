@@ -5,6 +5,7 @@ import {
   type LiveResource,
   type PortfolioPlan,
   type RoadmapStep,
+  type ScoreBreakdown,
   type StudentAnswers,
   type UniversityMatch,
 } from "@/lib/student-os-types";
@@ -397,8 +398,12 @@ export async function buildStudentOSReport(answers: StudentAnswers): Promise<Aim
   ]);
   const portfolioPlan = buildPortfolioPlan(profile, answers);
   const roadmap = buildRoadmap(profile, answers);
-  const skillScore = calculateSkillScore(profile, answers);
+  const readiness = computeReadiness(profile, answers);
+  const skillScore = readiness.score;
   const studentName = answers.fullName.trim() || "Student";
+  const summary = wantsFormalStudy(answers)
+    ? `${studentName}, your plan is built around ${profile.normalizedField}. The next best move is to strengthen ${profile.missingSkills.slice(0, 2).join(" and ")} while creating visible proof for ${profile.targetRoles[0]}.`
+    : `${studentName}, you said formal study does not feel right right now. Aimura will not force it; this plan focuses on coaching, flexible routes, and visible proof for ${profile.targetRoles[0]}, and we are here whenever your mind changes.`;
 
   return {
     id: `report_${Date.now()}`,
@@ -407,13 +412,14 @@ export async function buildStudentOSReport(answers: StudentAnswers): Promise<Aim
     answers,
     domainProfile: profile,
     skillScore,
+    scoreBreakdown: readiness.breakdown,
     intelligence: buildOfflineIntelligence(profile, answers, skillScore, roadmap),
     learningResources,
     universityMatches,
     portfolioPlan,
     roadmap,
     mentorPrompts: buildMentorPrompts(profile, answers, skillScore),
-    summary: `${studentName}, your plan is built around ${profile.normalizedField}. The next best move is to strengthen ${profile.missingSkills.slice(0, 2).join(" and ")} while creating visible proof for ${profile.targetRoles[0]}.`,
+    summary,
     safetyNote: SAFETY_NOTE,
   };
 }
@@ -527,8 +533,12 @@ async function buildLearningResources(profile: DomainProfile): Promise<LiveResou
 }
 
 async function buildUniversityMatches(profile: DomainProfile, answers: StudentAnswers): Promise<UniversityMatch[]> {
+  if (!wantsFormalStudy(answers)) return [];
+
   const preferredCountry =
-    answers.studyCountries[0]?.trim() || answers.country.trim() || "United Kingdom";
+    /stay/i.test(answers.studyLocationIntent)
+      ? answers.country.trim() || "United Kingdom"
+      : answers.studyCountries[0]?.trim() || answers.country.trim() || "United Kingdom";
   const universities = await fetchJson<HipolabsUniversity[]>(
     `https://universities.hipolabs.com/search?country=${encodeURIComponent(preferredCountry)}`,
   );
@@ -548,6 +558,10 @@ async function buildUniversityMatches(profile: DomainProfile, answers: StudentAn
 }
 
 function curatedUniversities(country: string, field: string): UniversityMatch[] {
+  if (/^india$/i.test(country.trim())) {
+    return curatedIndianUniversities(field);
+  }
+
   const lists: Record<string, Array<{ name: string; url: string }>> = {
     "United Kingdom": [
       { name: "University of Oxford", url: "https://www.ox.ac.uk" },
@@ -608,6 +622,53 @@ function curatedUniversities(country: string, field: string): UniversityMatch[] 
   ];
 }
 
+function curatedIndianUniversities(field: string): UniversityMatch[] {
+  const lowerField = field.toLowerCase();
+  const lists: Record<string, Array<{ name: string; url: string }>> = {
+    health: [
+      { name: "All India Institute of Medical Sciences, New Delhi", url: "https://www.aiims.edu" },
+      { name: "Christian Medical College Vellore", url: "https://www.cmch-vellore.edu" },
+      { name: "JIPMER Puducherry", url: "https://jipmer.edu.in" },
+      { name: "Manipal Academy of Higher Education", url: "https://manipal.edu" },
+    ],
+    creative: [
+      { name: "National Institute of Design", url: "https://www.nid.edu" },
+      { name: "Srishti Manipal Institute of Art, Design and Technology", url: "https://srishtimanipalinstitute.in" },
+      { name: "Film and Television Institute of India", url: "https://www.ftii.ac.in" },
+      { name: "KM Music Conservatory", url: "https://kmmc.in" },
+    ],
+    business: [
+      { name: "Indian Institute of Management Bangalore", url: "https://www.iimb.ac.in" },
+      { name: "Faculty of Management Studies, University of Delhi", url: "https://fms.edu" },
+      { name: "NMIMS Mumbai", url: "https://www.nmims.edu" },
+      { name: "Indian School of Business", url: "https://www.isb.edu" },
+    ],
+    default: [
+      { name: "Indian Institute of Science", url: "https://iisc.ac.in" },
+      { name: "Indian Institute of Technology Delhi", url: "https://home.iitd.ac.in" },
+      { name: "Indian Institute of Technology Bombay", url: "https://www.iitb.ac.in" },
+      { name: "University of Delhi", url: "https://www.du.ac.in" },
+    ],
+  };
+
+  const key =
+    /(medicine|clinical|health|doctor|nursing|pharmacy|biology)/i.test(lowerField)
+      ? "health"
+      : /(design|creative|photo|music|film|visual|performing)/i.test(lowerField)
+        ? "creative"
+        : /(business|finance|marketing|management|entrepreneur|economics)/i.test(lowerField)
+          ? "business"
+          : "default";
+
+  return lists[key].map((item) => ({
+    name: item.name,
+    country: "India",
+    fitReason: `India-based option to investigate for ${field}. Verify the exact program, fees, entrance route, and deadlines on the official site.`,
+    url: item.url,
+    tier: "Target",
+  }));
+}
+
 function buildPortfolioPlan(profile: DomainProfile, answers: StudentAnswers): PortfolioPlan {
   const role = profile.targetRoles[0];
   const name = answers.fullName.trim() || "Student";
@@ -649,6 +710,52 @@ function buildPortfolioPlan(profile: DomainProfile, answers: StudentAnswers): Po
 function buildRoadmap(profile: DomainProfile, answers: StudentAnswers): RoadmapStep[] {
   const hours = answers.weeklyHours || "6";
   const proof = proofStrategy(profile);
+
+  if (!wantsFormalStudy(answers)) {
+    return [
+      {
+        phase: "Coach Check-In",
+        timeframe: "Weeks 1-2",
+        focus: "Understand why formal study does not feel right and choose a respectful next path.",
+        actions: [
+          "Ask the AI Mentor to map your reasons: cost, confidence, timing, interest, family pressure, or uncertainty.",
+          `Pick one low-pressure experiment related to ${profile.targetRoles[0]}.`,
+          "Write what would make you feel ready to reconsider study later, if anything.",
+        ],
+      },
+      {
+        phase: "Proof Without Degree",
+        timeframe: "Weeks 3-8",
+        focus: `Build visible evidence through ${proof.artifact} without forcing a degree decision.`,
+        actions: [
+          proof.buildAction,
+          "Get feedback from a mentor, peer, practitioner, teacher, client, or community.",
+          "Save the work in a portfolio so your progress is real even without formal study.",
+        ],
+      },
+      {
+        phase: "Flexible Routes",
+        timeframe: "Weeks 9-16",
+        focus: "Explore apprenticeships, internships, entry projects, certificates, volunteering, or self-led practice.",
+        actions: [
+          `Shortlist 5 non-degree routes connected to ${profile.normalizedField}.`,
+          "Compare cost, time, support, proof required, and risk for each route.",
+          "Keep one study option open only if it genuinely helps your goal.",
+        ],
+      },
+      {
+        phase: "Decision Review",
+        timeframe: "Weeks 17-24",
+        focus: "Make a calm next decision: continue, work, study later, or ask for one-to-one guidance.",
+        actions: [
+          "Review your evidence, energy, budget, and support system.",
+          "Ask the AI Mentor what your strongest non-study path looks like now.",
+          "If your mind changes, return to Profile Intake and regenerate a formal study plan.",
+        ],
+      },
+    ];
+  }
+
   return [
     {
       phase: "Foundation",
@@ -693,6 +800,11 @@ function buildRoadmap(profile: DomainProfile, answers: StudentAnswers): RoadmapS
   ];
 }
 
+function wantsFormalStudy(answers: StudentAnswers) {
+  const text = `${answers.studyGoal} ${answers.studyLocationIntent}`.toLowerCase();
+  return !/(do not|don't|dont|not planning formal study)/i.test(text);
+}
+
 function buildMentorPrompts(profile: DomainProfile, answers: StudentAnswers, skillScore: number) {
   const proof = proofStrategy(profile);
   return [
@@ -719,8 +831,10 @@ function buildMentorPrompts(profile: DomainProfile, answers: StudentAnswers, ski
 // set the student can already evidence and (2) how well their education aligns
 // with that role. Concrete experience adds to it; interests are only an add-on.
 // Mismatched study AND skills deliberately pull the score down.
-function calculateSkillScore(profile: DomainProfile, answers: StudentAnswers) {
+// Returns the readiness score AND a transparent breakdown of how it was reached.
+function computeReadiness(profile: DomainProfile, answers: StudentAnswers): { score: number; breakdown: ScoreBreakdown } {
   const roleCluster = clusterOf(profile.parentDomain);
+  const role = profile.targetRoles[0] || answers.dreamRole || "this role";
 
   // (1) Skills linked to the target role. The curve is generous to beginners —
   // a fresh student is not expected to already have every advanced skill.
@@ -732,24 +846,39 @@ function calculateSkillScore(profile: DomainProfile, answers: StudentAnswers) {
   // (2) Education aligned with the target role's domain.
   const studyCluster = textCluster(answers.fieldOfStudy);
   let eduPoints: number;
-  if (!answers.fieldOfStudy.trim()) eduPoints = 12;
-  else if (studyCluster === roleCluster) eduPoints = 26;
-  else if (clustersRelated(studyCluster, roleCluster)) eduPoints = 15;
-  else eduPoints = 4; // studying something unrelated to the target role
+  let eduNote: string;
+  if (!answers.fieldOfStudy.trim()) {
+    eduPoints = 12;
+    eduNote = "Add your field of study to sharpen this score.";
+  } else if (studyCluster === roleCluster) {
+    eduPoints = 26;
+    eduNote = `Your studies in ${answers.fieldOfStudy} align directly with ${role}.`;
+  } else if (clustersRelated(studyCluster, roleCluster)) {
+    eduPoints = 15;
+    eduNote = `Your studies in ${answers.fieldOfStudy} are related to ${role}.`;
+  } else {
+    eduPoints = 4;
+    eduNote = `Your studies in ${answers.fieldOfStudy} differ from ${role}, so this is a bigger leap.`;
+  }
 
   // (3) Concrete evidence of doing the work.
   const yes = (value: string) => value.trim().toLowerCase() === "yes";
   const evidencePoints =
-    (yes(answers.hasProjects) ? 11 : 0) +
-    (yes(answers.hasInternship) ? 7 : 0) +
-    (yes(answers.hasGithub) ? 3 : 0) +
-    (yes(answers.hasLinkedin) ? 1 : 0); // up to 22
+    (yes(answers.hasProjects) ? 12 : 0) +
+    (yes(answers.hasInternship) ? 8 : 0) +
+    (yes(answers.hasGithub) ? 4 : 0) +
+    (yes(answers.hasLinkedin) ? 2 : 0); // up to 26
+  const evidenceItems = [
+    yes(answers.hasProjects) && "projects",
+    yes(answers.hasInternship) && "an internship",
+    yes(answers.hasGithub) && "a portfolio",
+  ].filter(Boolean) as string[];
 
   // (4) Interests — an add-on only, never the main driver.
   const interestCluster = textCluster(`${answers.subjects.join(" ")} ${answers.activities.join(" ")}`);
   const interestPoints = interestCluster === roleCluster ? 8 : interestCluster ? 3 : 0; // up to 8
 
-  let raw = skillPoints + eduPoints + evidencePoints + interestPoints; // up to 100
+  let total = skillPoints + eduPoints + evidencePoints + interestPoints; // up to 100
 
   // Penalise genuine mismatch: an unrelated field of study AND skills that don't
   // cover the target role both pull readiness down — hard when both apply.
@@ -759,10 +888,39 @@ function calculateSkillScore(profile: DomainProfile, answers: StudentAnswers) {
     studyCluster !== roleCluster &&
     !clustersRelated(studyCluster, roleCluster);
   const skillsMismatch = answers.skills.length > 0 && coverage < 0.2;
-  if (studyMismatch && skillsMismatch) raw = Math.round(raw * 0.6);
-  else if (studyMismatch || skillsMismatch) raw = Math.round(raw * 0.82);
+  let penaltyFactor = 1;
+  if (studyMismatch && skillsMismatch) penaltyFactor = 0.6;
+  else if (studyMismatch || skillsMismatch) penaltyFactor = 0.82;
+  total = Math.round(total * penaltyFactor);
+  const score = Math.max(18, Math.min(98, total));
 
-  return Math.max(18, Math.min(98, raw));
+  const notes = [
+    `Skills: you can evidence ${matched} of ${profile.requiredSkills.length} skills this role needs (${Math.round(coverage * 100)}%).`,
+    eduNote,
+    evidenceItems.length
+      ? `Experience: ${evidenceItems.join(", ")} add real credit.`
+      : "Experience: a project or internship would raise this fast.",
+  ];
+  if (penaltyFactor < 1) {
+    notes.push(
+      penaltyFactor === 0.6
+        ? "Both your studies and current skills differ from this role, so the score is reduced to stay honest."
+        : "Your studies or skills don't fully fit this role yet, so the score is slightly reduced.",
+    );
+  }
+
+  return {
+    score,
+    breakdown: {
+      skills: skillPoints,
+      education: eduPoints,
+      evidence: evidencePoints,
+      interests: interestPoints,
+      coveragePct: Math.round(coverage * 100),
+      penaltyFactor,
+      notes,
+    },
+  };
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -805,10 +963,54 @@ function knownEvidenceText(answers: StudentAnswers) {
     .toLowerCase();
 }
 
+// Common abbreviations / synonyms so "JS" counts as JavaScript, "ML" as Machine
+// Learning, etc. — otherwise literal substring matching under-credits students.
+const SKILL_ALIASES: Record<string, string[]> = {
+  javascript: ["js", "node", "nodejs", "react", "es6"],
+  typescript: ["ts"],
+  python: ["py", "pandas", "numpy"],
+  "machine learning": ["ml", "sklearn", "scikit"],
+  "deep learning": ["dl", "neural network", "neural networks"],
+  "natural language processing": ["nlp", "llm", "llms"],
+  "artificial intelligence": ["ai"],
+  "data analysis": ["data analytics", "analytics", "data analyst"],
+  "data structures": ["dsa", "algorithms"],
+  "cloud (aws/azure)": ["aws", "azure", "gcp", "cloud", "kubernetes", "k8s"],
+  "user research": ["ux research", "user testing"],
+  "ui design": ["ui", "figma"],
+  "visual design": ["graphic design"],
+  "financial modeling": ["financial modelling", "valuation", "dcf"],
+  "academic writing": ["research writing", "thesis", "dissertation"],
+  "camera operation": ["dslr", "mirrorless"],
+  "photo editing": ["lightroom", "photoshop", "retouching"],
+  "audio production": ["mixing", "mastering", "daw", "ableton", "logic pro"],
+  "patient communication": ["bedside manner", "clinical communication"],
+};
+
+function escapeRe(term: string) {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Short terms (<=3 chars like "ml", "ai", "js") must match as whole words to
+// avoid false positives ("ai" inside "domain"); longer terms match as substrings.
+function evidenceHas(evidence: string, term: string) {
+  const t = term.toLowerCase().trim();
+  if (!t) return false;
+  if (t.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRe(t)}([^a-z0-9]|$)`).test(evidence);
+  }
+  return evidence.includes(t);
+}
+
 function hasKnownSkill(skill: string, evidenceText: string) {
   const normalizedSkill = skill.toLowerCase().replace(/[()]/g, "").trim();
   if (!normalizedSkill || normalizedSkill.includes("other")) return false;
   if (evidenceText.includes(normalizedSkill)) return true;
+  // Canonical key for the alias table keeps the parenthetical (e.g. "cloud (aws/azure)").
+  const aliasKey = skill.toLowerCase().trim();
+  for (const alias of SKILL_ALIASES[aliasKey] || SKILL_ALIASES[normalizedSkill] || []) {
+    if (evidenceHas(evidenceText, alias)) return true;
+  }
   const tokens = normalizedSkill.split(/[^a-z0-9+#.]+/).filter((token) => token.length > 2);
   return tokens.length > 0 && tokens.every((token) => evidenceText.includes(token));
 }

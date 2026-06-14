@@ -18,9 +18,10 @@ import { type AuthResponse, type AuthUser } from "@/lib/student-os-types";
 
 type LoginLandingProps = {
   onAuthSuccess: (user: AuthUser, token: string) => void;
+  initialMode?: AuthMode;
 };
 
-type AuthMode = "signup" | "login";
+type AuthMode = "signup" | "login" | "forgot";
 
 const capabilities = [
   {
@@ -74,27 +75,52 @@ const firstMoves = [
   },
 ];
 
-export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
-  const [mode, setMode] = useState<AuthMode>("signup");
+export function LoginLanding({ onAuthSuccess, initialMode = "signup" }: LoginLandingProps) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [message, setMessage] = useState("Create your free account to save every roadmap you generate.");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activationLink, setActivationLink] = useState("");
+  const [resetLink, setResetLink] = useState("");
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setIsSubmitting(true);
-    setMessage(mode === "signup" ? "Creating your account..." : "Signing you in...");
+    setActivationLink("");
+    setResetLink("");
+    setMessage(mode === "signup" ? "Creating your account..." : mode === "forgot" ? "Preparing reset link..." : "Signing you in...");
 
     try {
-      const response = await fetch(`/api/auth/${mode}`, {
+      const endpoint = mode === "forgot" ? "/api/auth/forgot-password" : `/api/auth/${mode}`;
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          mode === "signup" ? form : { email: form.email, password: form.password },
+          mode === "signup"
+            ? form
+            : mode === "forgot"
+              ? { email: form.email }
+              : { email: form.email, password: form.password },
         ),
       });
       const data = (await response.json()) as AuthResponse;
-      if (!response.ok || !data.success || !data.user || !data.token) {
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Authentication failed.");
+      }
+
+      if (mode === "signup") {
+        setActivationLink(data.activationLink || "");
+        setMessage(data.message || "Account created. Activate your Aimura profile with the local link before signing in.");
+        return;
+      }
+
+      if (mode === "forgot") {
+        setResetLink(data.resetLink || "");
+        setMessage(data.message || "If the email exists, a reset link has been prepared.");
+        return;
+      }
+
+      if (!data.user || !data.token) {
         throw new Error(data.message || "Authentication failed.");
       }
       onAuthSuccess(data.user, data.token);
@@ -116,18 +142,18 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
         </nav>
       </div>
 
-      <section className="mx-auto grid max-w-7xl items-start gap-10 px-5 pb-10 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12">
-        <div className="max-w-2xl">
+      <section className="mx-auto grid max-w-7xl items-start gap-8 px-4 pb-10 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12">
+        <div className="min-w-0 max-w-2xl">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-control border border-aimura-green/30 bg-aimura-green/10 px-4 py-2 text-xs font-medium text-aimura-green">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-aimura-green/30 bg-aimura-green/10 px-3 py-2 text-xs font-medium text-aimura-green sm:rounded-control sm:px-4">
               <Sparkles className="size-4" aria-hidden />
-              Your career-connected student success OS
+              <span className="min-w-0 break-words">Your career-connected student success OS</span>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-control border border-aimura-moss/40 bg-aimura-panel/70 px-4 py-2 text-xs font-medium text-aimura-muted">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-aimura-moss/40 bg-aimura-panel/70 px-3 py-2 text-xs font-medium text-aimura-muted sm:rounded-control sm:px-4">
               Built on Microsoft Foundry IQ
             </div>
           </div>
-          <h1 className="mt-6 text-5xl font-semibold leading-[0.96] tracking-[-0.05em] text-aimura-white sm:text-6xl">
+          <h1 className="mt-6 break-words text-4xl font-semibold leading-[1.02] tracking-[-0.04em] text-aimura-white sm:text-6xl sm:leading-[0.96] sm:tracking-[-0.05em]">
             Plan your study path. Build your career path.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-8 text-aimura-muted sm:text-lg">
@@ -149,7 +175,7 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
           </div>
         </div>
 
-        <div className="aimura-card rounded-[2rem] p-6 sm:p-7">
+        <div className="aimura-card min-w-0 rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-7">
           <div className="mb-5 flex rounded-control border border-aimura-moss/35 bg-aimura-panel-2 p-1">
             <button
               className={`flex-1 rounded-control px-4 py-2 text-sm font-semibold transition ${mode === "signup" ? "bg-aimura-green text-white" : "text-aimura-muted"}`}
@@ -193,6 +219,7 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
               />
             </label>
 
+            {mode !== "forgot" ? (
             <label className="block rounded-2xl border border-aimura-moss/25 bg-aimura-panel-2 p-4">
               <span className="text-xs uppercase tracking-[0.18em] text-aimura-muted">Password</span>
               <input
@@ -205,22 +232,69 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
                 value={form.password}
               />
             </label>
+            ) : null}
 
             <button
               className="aimura-focus-ring aimura-green-glow mt-5 inline-flex w-full items-center justify-center gap-2 rounded-control bg-aimura-green px-6 py-3 text-sm font-semibold text-white transition hover:bg-aimura-mint disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isSubmitting}
               type="submit"
             >
-              {isSubmitting ? "Please wait..." : mode === "signup" ? "Create account & enter" : "Log in & enter"}
+              {isSubmitting ? "Please wait..." : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : "Log in & enter"}
               {!isSubmitting ? <ArrowRight className="size-4" aria-hidden /> : null}
             </button>
+            {mode === "login" ? (
+              <button
+                className="aimura-focus-ring mt-3 w-full rounded-control border border-aimura-moss/40 px-5 py-2.5 text-sm font-semibold text-aimura-muted transition hover:border-aimura-green/50 hover:text-aimura-white"
+                onClick={() => {
+                  setMode("forgot");
+                  setMessage("Enter your email and Aimura will prepare a password reset link.");
+                }}
+                type="button"
+              >
+                Forgot password?
+              </button>
+            ) : null}
+            {mode === "forgot" ? (
+              <button
+                className="aimura-focus-ring mt-3 w-full rounded-control border border-aimura-moss/40 px-5 py-2.5 text-sm font-semibold text-aimura-muted transition hover:border-aimura-green/50 hover:text-aimura-white"
+                onClick={() => {
+                  setMode("login");
+                  setMessage("Log in after activating your profile or resetting your password.");
+                }}
+                type="button"
+              >
+                Back to login
+              </button>
+            ) : null}
             <p className="mt-4 text-sm leading-6 text-aimura-muted">{message}</p>
+            {activationLink ? (
+              <div className="mt-4 rounded-2xl border border-aimura-green/30 bg-aimura-green/10 p-4 text-sm leading-6 text-aimura-muted">
+                <p className="font-semibold text-aimura-white">Activation required before login.</p>
+                <p className="mt-1">For this demo, activate your profile directly inside the app. No domain or email provider is needed.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a className="rounded-control bg-aimura-green px-4 py-2 text-sm font-semibold text-aimura-black" href={activationLink}>
+                    Activate profile
+                  </a>
+                </div>
+              </div>
+            ) : null}
+            {resetLink ? (
+              <div className="mt-4 rounded-2xl border border-aimura-blue/30 bg-aimura-blue/10 p-4 text-sm leading-6 text-aimura-muted">
+                <p className="font-semibold text-aimura-white">Password reset link prepared.</p>
+                <p className="mt-1">Use the local reset link below. No email provider is needed for the demo.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a className="rounded-control bg-aimura-blue px-4 py-2 text-sm font-semibold text-aimura-black" href={resetLink}>
+                    Reset password
+                  </a>
+                </div>
+              </div>
+            ) : null}
           </form>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-12">
-        <div className="aimura-card rounded-[2rem] p-6 sm:p-8">
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-8 lg:px-12">
+        <div className="aimura-card rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.28em] text-aimura-green">See your journey before you start</p>
@@ -242,9 +316,9 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-12">
-        <p className="text-sm font-medium uppercase tracking-[0.28em] text-aimura-green">What you can do here</p>
-        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-[-0.03em] text-aimura-white sm:text-4xl">
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-8 lg:px-12">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-aimura-green sm:tracking-[0.28em]">What you can do here</p>
+        <h2 className="mt-3 max-w-2xl break-words text-3xl font-semibold tracking-[-0.03em] text-aimura-white sm:text-4xl">
           Everything a student needs to go from goal to offer.
         </h2>
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -260,10 +334,10 @@ export function LoginLanding({ onAuthSuccess }: LoginLandingProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-12">
-        <div className="aimura-card rounded-[2rem] p-6 sm:p-8">
-          <p className="text-sm font-medium uppercase tracking-[0.28em] text-aimura-green">Your best first moves once you log in</p>
-          <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-[-0.03em] text-aimura-white sm:text-4xl">
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-8 lg:px-12">
+        <div className="aimura-card rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-8">
+          <p className="text-sm font-medium uppercase tracking-[0.16em] text-aimura-green sm:tracking-[0.28em]">Your best first moves once you log in</p>
+          <h2 className="mt-3 max-w-2xl break-words text-3xl font-semibold tracking-[-0.03em] text-aimura-white sm:text-4xl">
             Four steps to your first roadmap.
           </h2>
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -260,6 +260,17 @@ function hasCareerGap(answers: StudentAnswers): boolean {
   return gap.length > 0 && gap !== "no gap" && gap !== "no gaps";
 }
 
+function formatFocus(focus: string[] | unknown) {
+  if (Array.isArray(focus)) return focus.length ? focus.join(", ") : "Complete Career Plan";
+  if (typeof focus === "string" && focus.trim()) return focus;
+  return "Complete Career Plan";
+}
+
+function wantsFormalStudy(answers: StudentAnswers) {
+  const text = `${answers.studyGoal} ${answers.studyLocationIntent}`.toLowerCase();
+  return !/(do not|don't|dont|not planning formal study)/i.test(text);
+}
+
 export function buildOfflineIntelligence(
   profile: DomainProfile,
   answers: StudentAnswers,
@@ -269,7 +280,9 @@ export function buildOfflineIntelligence(
   const market = marketFor(profile.normalizedField);
   const role = profile.targetRoles[0];
   const country = answers.studyCountries[0] || answers.country || "your target country";
+  const currency = answers.budgetCurrency || "selected currency";
   const proof = proofStrategy(profile);
+  const formalStudy = wantsFormalStudy(answers);
 
   const riskStrategy: RiskItem[] = [
     {
@@ -282,22 +295,40 @@ export function buildOfflineIntelligence(
       severity: answers.hasProjects.toLowerCase() === "yes" ? "Low" : "Medium",
       mitigation: `${proof.mitigation}`,
     },
-    {
-      risk:
-        answers.needScholarship.toLowerCase() === "yes"
-          ? "Funding and scholarship competition can delay study-abroad plans."
-          : "Tuition and living costs can exceed early estimates.",
-      severity: answers.needScholarship.toLowerCase() === "yes" ? "High" : "Medium",
-      mitigation: `Verify ${country} fees and scholarship deadlines early on official university pages, and prepare a budget buffer.`,
-    },
-    {
-      risk: englishReady(answers)
-        ? "Application timing can slip without a tracked deadline list."
-        : `An English test score (${answers.englishTest || "exam to be decided"}) that is not yet secured can stall admissions timelines.`,
-      severity: englishReady(answers) ? "Low" : "Medium",
-      mitigation: "Lock dates for your English test and applications now, and work backwards from each deadline.",
-    },
   ];
+
+  if (formalStudy) {
+    riskStrategy.push(
+      {
+        risk:
+          answers.needScholarship.toLowerCase() === "yes"
+            ? `Funding and scholarship competition can delay study plans in ${currency}.`
+            : `Tuition and living costs can exceed early estimates in ${currency}.`,
+        severity: answers.needScholarship.toLowerCase() === "yes" ? "High" : "Medium",
+        mitigation: `Verify ${country} fees and scholarship deadlines early on official university pages, and prepare a budget buffer.`,
+      },
+      {
+        risk: englishReady(answers)
+          ? "Application timing can slip without a tracked deadline list."
+          : `An English test score (${answers.englishTest || "exam to be decided"}) that is not yet secured can stall admissions timelines.`,
+        severity: englishReady(answers) ? "Low" : "Medium",
+        mitigation: "Lock dates for your English test and applications now, and work backwards from each deadline.",
+      },
+    );
+  } else {
+    riskStrategy.push(
+      {
+        risk: "Without formal study, progress can feel unclear unless you choose a visible proof path.",
+        severity: "Medium",
+        mitigation: `Use ${proof.article} as the anchor: build, publish, ask for feedback, and review progress every 2 weeks.`,
+      },
+      {
+        risk: "Flexible routes can become too broad if you compare too many options at once.",
+        severity: "Low",
+        mitigation: `Shortlist only 3 routes for ${role}: one project route, one work/volunteer route, and one certificate or mentor-guided route.`,
+      },
+    );
+  }
 
   if (hasCareerGap(answers)) {
     riskStrategy.push({
@@ -312,7 +343,7 @@ export function buildOfflineIntelligence(
 
   return {
     headline: `${role} pathway intelligence for ${profile.normalizedField}`,
-    fitSummary: `Based on your goal of ${role}, your strengths in ${(answers.skills[0] || answers.subjects[0] || "your current interests")} give you a workable start. Your current readiness is ${skillScore}/100, and closing ${profile.missingSkills.slice(0, 2).join(" and ")} is the highest-leverage next move.`,
+    fitSummary: `Based on your goal of ${role}, your strengths in ${(answers.skills[0] || answers.subjects[0] || "your current interests")} give you a workable start. Your current readiness is ${skillScore}/100, and closing ${profile.missingSkills.slice(0, 2).join(" and ")} is the highest-leverage next move.${/not planning|don't|dont|do not/i.test(answers.studyLocationIntent || answers.studyGoal) ? " Since you are not choosing formal study right now, the plan leans into coaching, proof-building, and flexible non-degree routes." : ""}`,
     jobMarket: {
       demandLevel: market.demandLevel,
       outlook: market.outlook,
@@ -467,10 +498,12 @@ export async function enrichIntelligenceWithAI(
     `Normalized field: ${profile.normalizedField} | Required skills: ${profile.requiredSkills.join(", ")}`,
     `Known skills: ${answers.skills.join(", ") || "n/a"} | Missing: ${profile.missingSkills.join(", ")}`,
     `Skill score: ${report.skillScore}/100`,
-    `Study countries: ${answers.studyCountries.join(", ") || "n/a"} | Budget (GBP): ${answers.budgetRange || "n/a"} | Scholarship needed: ${answers.needScholarship || "n/a"} | English test: ${answers.englishTest || "n/a"} (score: ${answers.englishScore || "not provided"})`,
+    wantsFormalStudy(answers)
+      ? `Study goal: ${answers.studyGoal || "n/a"} | Location intent: ${answers.studyLocationIntent || "n/a"} | Study countries: ${answers.studyCountries.join(", ") || answers.country || "n/a"} | Budget (${answers.budgetCurrency || "selected currency"}): ${answers.budgetRange || "n/a"} | Scholarship needed: ${answers.needScholarship || "n/a"} | English test: ${answers.englishTest || "n/a"} (score: ${answers.englishScore || "not provided"})`
+      : `Formal study: not selected right now. Do not create university, scholarship, visa, or English-test recommendations unless the student asks to revisit study later.`,
     `Study/career gap: ${answers.careerGap || "not specified"}`,
     `Weekly hours: ${answers.weeklyHours || "n/a"} | Learning style: ${answers.learningStyle || "n/a"} | Speed: ${answers.learningSpeed || "n/a"}`,
-    `Main focus requested: ${answers.helpFocus || "Complete Career Plan"}`,
+    `Support preference: ${answers.supportPreference || "n/a"} | Main focus requested: ${formatFocus(answers.helpFocus)}`,
     "",
     "The detailedTimetable MUST have exactly 12 weekly entries, each grounded in this student's skills and goal.",
   ].join("\n");

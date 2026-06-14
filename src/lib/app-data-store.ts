@@ -6,6 +6,10 @@ import { type AimuraStudentReport, type AuthUser } from "@/lib/student-os-types"
 type UserRecord = AuthUser & {
   passwordHash: string;
   createdAt: string;
+  activatedAt?: string;
+  activationToken?: string;
+  resetToken?: string;
+  resetExpiresAt?: string;
 };
 
 type StoredReport = AimuraStudentReport & {
@@ -45,10 +49,17 @@ export async function createUser(name: string, email: string, password: string) 
     email: normalizedEmail,
     passwordHash: hashPassword(password),
     createdAt: new Date().toISOString(),
+    activationToken: randomToken("activate"),
   };
   database.users[id] = user;
   await writeDatabase(database);
-  return { success: true as const, user: publicUser(user), token: tokenForUser(user.id) };
+  return {
+    success: true as const,
+    user: publicUser(user),
+    requiresActivation: true,
+    activationToken: user.activationToken,
+    message: "Account created. Please activate your Aimura profile with the local link before signing in.",
+  };
 }
 
 export async function authenticateUser(email: string, password: string) {
@@ -59,7 +70,69 @@ export async function authenticateUser(email: string, password: string) {
   if (user.passwordHash !== hashPassword(password)) {
     return { success: false as const, message: "The password is incorrect." };
   }
+  if (user.activationToken && !user.activatedAt) {
+    return {
+      success: false as const,
+      requiresActivation: true,
+      message: "Please activate your Aimura profile with the local link before signing in.",
+    };
+  }
   return { success: true as const, user: publicUser(user), token: tokenForUser(user.id) };
+}
+
+export async function activateUser(token: string) {
+  const database = await readDatabase();
+  const user = Object.values(database.users).find((entry) => entry.activationToken === token);
+  if (!user) return { success: false as const, message: "This activation link is invalid or already used." };
+
+  user.activatedAt = new Date().toISOString();
+  delete user.activationToken;
+  await writeDatabase(database);
+  return {
+    success: true as const,
+    user: publicUser(user),
+    token: tokenForUser(user.id),
+    message: "Your Aimura profile is active. You can now sign in.",
+  };
+}
+
+export async function createPasswordReset(email: string) {
+  const database = await readDatabase();
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = Object.values(database.users).find((entry) => entry.email === normalizedEmail);
+  if (!user) {
+    return {
+      success: true as const,
+      message: "If an Aimura profile exists for that email, a reset link has been prepared.",
+    };
+  }
+
+  user.resetToken = randomToken("reset");
+  user.resetExpiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString();
+  await writeDatabase(database);
+  return {
+    success: true as const,
+    resetToken: user.resetToken,
+    message: "Password reset link prepared. It expires in 30 minutes.",
+  };
+}
+
+export async function resetPassword(token: string, password: string) {
+  const database = await readDatabase();
+  const user = Object.values(database.users).find((entry) => entry.resetToken === token);
+  if (!user || !user.resetExpiresAt || new Date(user.resetExpiresAt).getTime() < Date.now()) {
+    return { success: false as const, message: "This reset link is invalid or expired." };
+  }
+
+  user.passwordHash = hashPassword(password);
+  delete user.resetToken;
+  delete user.resetExpiresAt;
+  if (user.activationToken && !user.activatedAt) {
+    user.activatedAt = new Date().toISOString();
+    delete user.activationToken;
+  }
+  await writeDatabase(database);
+  return { success: true as const, message: "Password updated. You can sign in now." };
 }
 
 export async function saveReport(userId: string, report: AimuraStudentReport) {
@@ -109,6 +182,10 @@ function hashPassword(password: string) {
 
 function tokenForUser(userId: string) {
   return `aimura_${Buffer.from(userId).toString("base64url")}`;
+}
+
+function randomToken(prefix: string) {
+  return `${prefix}_${Date.now()}_${randomUUID().replace(/-/g, "")}`;
 }
 
 function publicUser(user: UserRecord): AuthUser {

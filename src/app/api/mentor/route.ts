@@ -15,9 +15,15 @@ const MENTOR_PERSONA = [
   "Safety: you give educational and career guidance only. Never guarantee admission, visas, scholarships, salaries, or job offers. When the student asks about those, remind them to verify with official providers.",
 ].join(" ");
 
+function wantsFormalStudy(report: AimuraStudentReport) {
+  const text = `${report.answers.studyGoal} ${report.answers.studyLocationIntent}`.toLowerCase();
+  return !/(do not|don't|dont|not planning formal study)/i.test(text);
+}
+
 function buildSystemPrompt(report: AimuraStudentReport) {
   const profile = report.domainProfile;
   const answers = report.answers;
+  const formalStudy = wantsFormalStudy(report);
   const roadmap = report.roadmap
     .map((step) => `- ${step.phase} (${step.timeframe}): ${step.focus}`)
     .join("\n");
@@ -35,12 +41,16 @@ function buildSystemPrompt(report: AimuraStudentReport) {
     `Age: ${answers.age || "not specified"}, residence: ${answers.country || "not specified"}`,
     `Education: ${answers.educationLevel || "not specified"} in ${answers.fieldOfStudy || "not specified"} (GPA ${answers.gpa || "n/a"})`,
     `Dream companies: ${answers.dreamCompanies.join(", ") || "not specified"}; career priority: ${answers.careerPriority || "not specified"}`,
-    `Preferred study countries: ${answers.studyCountries.join(", ") || answers.country || "not specified"}`,
-    `Budget (GBP): ${answers.budgetRange || "not specified"}; scholarship needed: ${answers.needScholarship || "n/a"}; English test: ${answers.englishTest || "n/a"} (score: ${answers.englishScore || "not provided"}); study/career gap: ${answers.careerGap || "not specified"}`,
+    formalStudy
+      ? `Next study goal: ${answers.studyGoal || "not specified"}; study location intent: ${answers.studyLocationIntent || "not specified"}; preferred study countries: ${answers.studyCountries.join(", ") || answers.country || "not specified"}`
+      : "Formal study is not selected right now. Do not push universities, visas, scholarships, or English-test planning unless the student asks to revisit study later.",
+    formalStudy
+      ? `Budget (${answers.budgetCurrency || "selected currency"}): ${answers.budgetRange || "not specified"}; scholarship needed: ${answers.needScholarship || "n/a"}; English test: ${answers.englishTest || "n/a"} (score: ${answers.englishScore || "not provided"}); study/career gap: ${answers.careerGap || "not specified"}`
+      : `Flexible-path context: focus on proof-building, mentor coaching, internships, apprenticeships, volunteering, entry projects, certificates, or self-led practice. Study/career gap: ${answers.careerGap || "not specified"}`,
     `Learning style: ${answers.learningStyle || "not specified"} (${answers.learningSpeed || "n/a"})`,
     `Weekly study hours: ${answers.weeklyHours || "not specified"}`,
     `Experience flags — projects: ${answers.hasProjects || "n/a"}, internship: ${answers.hasInternship || "n/a"}, GitHub: ${answers.hasGithub || "n/a"}, LinkedIn: ${answers.hasLinkedin || "n/a"}`,
-    `Main focus requested: ${answers.helpFocus || "Complete Career Plan"}`,
+    `Support preference: ${answers.supportPreference || "not specified"}; main focus requested: ${formatFocus(answers.helpFocus)}`,
     "",
     "JOB MARKET (from the student's report):",
     `Demand: ${report.intelligence.jobMarket.demandLevel}. ${report.intelligence.jobMarket.outlook}`,
@@ -50,6 +60,12 @@ function buildSystemPrompt(report: AimuraStudentReport) {
     "",
     `One-line summary already shown to the student: ${report.summary}`,
   ].join("\n");
+}
+
+function formatFocus(focus: string[] | unknown) {
+  if (Array.isArray(focus)) return focus.length ? focus.join(", ") : "Complete Career Plan";
+  if (typeof focus === "string" && focus.trim()) return focus;
+  return "Complete Career Plan";
 }
 
 function hashStr(value: string) {
@@ -74,6 +90,7 @@ type MentorContext = {
   studyCountries: string;
   budget: string;
   score: number;
+  formalStudy: boolean;
   proof: ReturnType<typeof mentorProofStrategy>;
   seed: number;
   deeper: boolean;
@@ -88,6 +105,20 @@ type Intent = {
 // A small career-coaching knowledge base. Each intent is scored against the
 // student's question; the best match answers, grounded in the real report.
 const INTENTS: Intent[] = [
+  {
+    id: "no-study",
+    keywords: ["dont want to study", "don't want to study", "do not want to study", "no study", "not study", "skip college", "no university", "hate studying", "study feels wrong"],
+    build: (c) => lines(
+      `That's allowed, ${c.first}. Aimura is here to help you think clearly, not force a degree.`,
+      "",
+      "First, name the reason honestly:",
+      "- Is it cost, pressure, low interest, fear of failure, bad past experience, or wanting to work sooner?",
+      `- If you still want ${c.role}, we can test a non-degree route through ${c.proof.evidenceLabel}, internships, apprenticeships, local projects, volunteering, or client work.`,
+      "- If you simply need a pause, keep one tiny learning habit alive so returning later feels easier.",
+      "",
+      "If your mind changes later, come back and Aimura will rebuild the study plan with you. What is the biggest reason study does not feel right right now?",
+    ),
+  },
   {
     id: "learn-first",
     keywords: ["learn first", "start learning", "where do i start", "where to start", "what to learn", "begin", "basics", "foundation", "prerequisite", "first step", "study first"],
@@ -253,6 +284,17 @@ const INTENTS: Intent[] = [
     id: "universities",
     keywords: ["universit", "college", "study abroad", "masters", "ms ", "abroad", "which university", "shortlist", "course to study", "degree", "program"],
     build: (c) => {
+      if (!c.formalStudy) {
+        return lines(
+          `${c.first}, you chose not to pursue formal study right now, so I won't force university shortlists.`,
+          "",
+          `- Start with visible proof for ${c.role}: create ${c.proof.smallArtifact} and save it in ${c.proof.platform}.`,
+          "- Compare non-degree routes: entry projects, internships, apprenticeships, volunteering, certificates, or mentor-guided practice.",
+          "- Keep a study option open only if it genuinely supports your goal later.",
+          "",
+          "Want me to map 3 non-degree routes for your current situation?",
+        );
+      }
       const unis = c.report.universityMatches.slice(0, 3).map((u) => u.name).filter(Boolean);
       return lines(
         `For ${c.studyCountries}, build a 3-tier shortlist, ${c.first}:`,
@@ -270,42 +312,74 @@ const INTENTS: Intent[] = [
   {
     id: "scholarship",
     keywords: ["scholarship", "funding", "fees", "afford", "financial", "cost", "expensive", "cheap", "budget", "tuition", "grant", "loan"],
-    build: (c) => lines(
-      `On funding, ${c.first} — your budget is ${c.budget || "tight"}, so be strategic:`,
-      "",
-      "- Target merit + need scholarships early; deadlines are often months before admission.",
-      "- Favour countries/universities known for funding international students in your field.",
-      "- A strong portfolio and a clear statement of purpose directly improve scholarship odds.",
-      "- Lower-cost routes: public universities, EU options, or online + on-campus hybrids.",
-      "",
-      "Always confirm fees and scholarship terms on official pages. Want a list of what makes a scholarship application strong?",
-    ),
+    build: (c) =>
+      c.formalStudy
+        ? lines(
+            `On funding, ${c.first} — your budget is ${c.budget || "tight"}, so be strategic:`,
+            "",
+            "- Target merit + need scholarships early; deadlines are often months before admission.",
+            "- Favour countries/universities known for funding international students in your field.",
+            "- A strong portfolio and a clear statement of purpose directly improve scholarship odds.",
+            "- Lower-cost routes: public universities, EU options, or online + on-campus hybrids.",
+            "",
+            "Always confirm fees and scholarship terms on official pages. Want a list of what makes a scholarship application strong?",
+          )
+        : lines(
+            `On cost, ${c.first}: since formal study is not selected, keep spending tied to proof, not degrees.`,
+            "",
+            "- Prioritise free/low-cost practice, internships, volunteering, apprenticeships, and mentor feedback.",
+            `- Spend only where it helps you produce ${c.proof.evidenceLabel}.`,
+            "- Revisit scholarships only if you later choose a formal study path.",
+            "",
+            "Want a low-cost 4-week proof-building plan?",
+          ),
   },
   {
     id: "visa",
     keywords: ["visa", "immigration", "pr ", "settle", "work permit", "sponsor", "relocate", "post study", "stay back"],
-    build: (c) => lines(
-      `Visa and stay-back rules matter a lot for ${c.studyCountries}, ${c.first}:`,
-      "",
-      "- Check each country's post-study work visa length and conditions — they change often.",
-      "- Pick programs/cities with stronger job markets in your field for better odds.",
-      "- Keep documents (finances, English test, offer letter) ready early.",
-      "",
-      "I can't give legal or guaranteed immigration advice — always verify on the official government site. Want help comparing post-study options by country?",
-    ),
+    build: (c) =>
+      c.formalStudy
+        ? lines(
+            `Visa and stay-back rules matter a lot for ${c.studyCountries}, ${c.first}:`,
+            "",
+            "- Check each country's post-study work visa length and conditions — they change often.",
+            "- Pick programs/cities with stronger job markets in your field for better odds.",
+            "- Keep documents (finances, English test, offer letter) ready early.",
+            "",
+            "I can't give legal or guaranteed immigration advice — always verify on the official government site. Want help comparing post-study options by country?",
+          )
+        : lines(
+            `${c.first}, visa planning only matters if you decide to study or work abroad later.`,
+            "",
+            "- For now, focus on proof and local/flexible routes in your current country.",
+            "- If relocation becomes a goal, verify current rules on official government pages.",
+            "- Keep documents organised, but do not let visa planning distract from building evidence.",
+            "",
+            "Want help choosing a local next step instead?",
+          ),
   },
   {
     id: "english-test",
     keywords: ["ielts", "toefl", "pte", "english test", "language test", "duolingo test"],
-    build: (c) => lines(
-      `On the English test, ${c.first} — you picked "${c.report.answers.englishTest || "not set yet"}"${c.report.answers.englishScore ? ` (score: ${c.report.answers.englishScore})` : ""}:`,
-      "",
-      "- Book it early; offers and visas often need the score before deadlines.",
-      "- Typical targets: IELTS ~6.5-7.0, TOEFL ~90-100, PTE ~58-65, Duolingo ~115-125 — check each university's exact requirement.",
-      "- 3-4 focused weeks of daily practice is usually enough if your English base is good.",
-      "",
-      "Want a 3-week prep outline for it?",
-    ),
+    build: (c) =>
+      c.formalStudy
+        ? lines(
+            `On the English test, ${c.first} — you picked "${c.report.answers.englishTest || "not set yet"}"${c.report.answers.englishScore ? ` (score: ${c.report.answers.englishScore})` : ""}:`,
+            "",
+            "- Book it early; offers and visas often need the score before deadlines.",
+            "- Typical targets: IELTS ~6.5-7.0, TOEFL ~90-100, PTE ~58-65, Duolingo ~115-125 — check each university's exact requirement.",
+            "- 3-4 focused weeks of daily practice is usually enough if your English base is good.",
+            "",
+            "Want a 3-week prep outline for it?",
+          )
+        : lines(
+            `${c.first}, you do not need an English-test plan unless you decide to apply for formal study later.`,
+            "",
+            "- Put that energy into communication proof: writing samples, presentations, client notes, or interview stories.",
+            "- If study becomes active later, come back and I will help you plan IELTS/TOEFL/PTE properly.",
+            "",
+            "Want a communication-practice task for this week?",
+          ),
   },
   {
     id: "networking",
@@ -428,6 +502,7 @@ function offlineMentorReply(report: AimuraStudentReport, messages: ChatMessage[]
     studyCountries: report.answers.studyCountries.join(", ") || report.answers.country || "your preferred countries",
     budget: report.answers.budgetRange,
     score: report.skillScore,
+    formalStudy: wantsFormalStudy(report),
     proof: mentorProofStrategy(report),
     seed: hashStr(lastUser),
     deeper: isFollowUp,
@@ -587,6 +662,10 @@ function textToStream(text: string) {
   });
 }
 
+function safeHeader(value: string) {
+  return value.replace(/[^\x20-\x7E]/g, " ").slice(0, 600);
+}
+
 function isValidMessage(value: unknown): value is ChatMessage {
   if (!value || typeof value !== "object") return false;
   const message = value as Record<string, unknown>;
@@ -619,13 +698,14 @@ export async function POST(request: Request) {
 
   const system = buildSystemPrompt(report);
 
-  let live: Awaited<ReturnType<typeof streamMentorReply>> = null;
+  let result: Awaited<ReturnType<typeof streamMentorReply>> = { stream: null, configured: [], failures: [] };
   try {
-    live = await streamMentorReply(system, messages);
+    result = await streamMentorReply(system, messages);
   } catch {
-    live = null;
+    result = { stream: null, configured: [], failures: [{ engine: "offline", message: "Mentor provider chain failed before a live provider could start." }] };
   }
 
+  const live = result.stream;
   if (live) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
@@ -647,6 +727,8 @@ export async function POST(request: Request) {
         "content-type": "text/plain; charset=utf-8",
         "cache-control": "no-store",
         "x-aimura-engine": live.engine,
+        "x-aimura-configured-providers": result.configured.join(",") || "none",
+        "x-aimura-provider-errors": safeHeader(result.failures.map((failure) => `${failure.engine}: ${failure.message}`).join(" | ")),
       },
     });
   }
@@ -658,6 +740,8 @@ export async function POST(request: Request) {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
       "x-aimura-engine": "offline",
+      "x-aimura-configured-providers": result.configured.join(",") || "none",
+      "x-aimura-provider-errors": safeHeader(result.failures.map((failure) => `${failure.engine}: ${failure.message}`).join(" | ")),
     },
   });
 }

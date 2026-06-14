@@ -72,7 +72,10 @@ function normalizeAnswers(value: unknown): StudentAnswers {
     hasGithub: text("hasGithub"),
     hasLinkedin: text("hasLinkedin"),
     careerGap: text("careerGap"),
+    studyGoal: text("studyGoal"),
+    studyLocationIntent: text("studyLocationIntent"),
     studyCountries: list("studyCountries"),
+    budgetCurrency: text("budgetCurrency") || "GBP £",
     budgetRange: text("budgetRange"),
     needScholarship: text("needScholarship"),
     englishTest: text("englishTest"),
@@ -82,7 +85,8 @@ function normalizeAnswers(value: unknown): StudentAnswers {
     learningSpeed: text("learningSpeed"),
     wantMentor: text("wantMentor"),
     wantCommunity: text("wantCommunity"),
-    helpFocus: text("helpFocus"),
+    supportPreference: text("supportPreference"),
+    helpFocus: list("helpFocus"),
   };
 }
 

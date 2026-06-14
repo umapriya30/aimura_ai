@@ -1,222 +1,326 @@
 # Aimura AI
 
-**Plan your study path. Build your career path.**
+Aimura AI is a student career-planning OS. It turns a student's profile,
+career goal, current skills, study preferences, country choices, budget, and
+weekly availability into a generated study-to-career plan.
 
-Aimura AI is a career-connected student success OS. It turns a student's
-profile — background, dream role, skills, budget, and country preferences —
-into an explainable education-to-career roadmap with career intelligence,
-an honest skill score, university signals, a week-by-week timetable, and a
-live AI mentor.
 
-## Premium Career OS interface
+The app includes:
 
-The Next.js app has been redesigned into a premium dark SaaS-style Career
-Operating System rather than a repeated-card report page:
+- Guided student intake with saved drafts.
+- Generated My Plan dashboard with readiness score and career journey chart.
+- Career Fit intelligence with market outlook, risks, and fallback routes.
+- Learn, Build Proof, Study Options, Weekly Plan, and Mentor modules.
+- AI Mentor chat grounded in the generated report.
+- Export, save, print/PDF, and share actions.
+- Local demo auth with activation and password-reset links shown inside the app.
 
-- Central theme tokens in `src/app/globals.css` plus a category accent map in
-  `src/lib/category-theme.ts`.
-- Category identities across the product: My Plan, Career Fit, Learn, Build
-  Proof, Study Options, Weekly Plan, and Mentor each has its own accent,
-  icon treatment, header tone, CTA language, hover state, and status styling.
-- Authenticated workspace shell with a compact top nav, activity status, and
-  responsive layout.
-- Upgraded 7-step intake with accent-aware progress, completed-section
-  tracking, helper copy, validation, loading/success/error states, and demo
-  profile loading without replacing real dynamic user input.
-- Generated report preview with metric cards for Skill Score, Target Role,
-  Timeline, Top Gaps, and Next Action.
-- Premium module navigator with sticky desktop behavior, mobile tabs/dropdown,
-  status indicators, progress rails, active glow, and category-colored icons.
-- My Plan dashboard now combines a cleaner career journey chart, insight
-  cards, and one clear action path: Continue Weekly Plan or Ask AI Mentor.
-- Weekly Plan is a timeline/stepper with phase details, skills, evidence,
-  Start Phase, Mark Done, Add to Calendar, and Ask Mentor actions.
-- AI Decision Logic replaces the old reasoning block with expandable numbered
-  reasoning steps covering input signals, scoring, market intelligence,
-  recommendation, and safety.
-- Export actions include guarded loading states, duplicate-click prevention,
-  toast feedback, local session save, print-to-PDF, and email share draft.
+## Team Members
+Ankit Ranjan
+Github link : https://github.com/ankitranjan-dsai
+Uma Siva Priya
+Github link : https://github.com/umapriya30
 
-> **Agents League @ AISF 2026 — Track: 🧠 Reasoning Agents**
-> **Microsoft IQ integration: Foundry IQ (Azure AI Foundry)** powers the
-> mentor and the career-intelligence reasoning, with a resilient fallback
-> chain and a deterministic offline engine.
+## Problem Statement
 
----
+Students often receive career advice, university advice, course suggestions,
+and job-preparation guidance from disconnected sources. The result is a noisy
+planning experience: one tool recommends universities, another lists courses,
+another gives generic career tips, and the student still has to connect those
+pieces into a realistic pathway.
 
-## Why this is a reasoning agent
+Aimura AI solves this by creating one grounded student plan from one intake:
+career fit, skill gaps, study options, portfolio proof, weekly execution, and a
+mentor that answers follow-up questions using the student's generated report.
 
-Aimura runs a multi-step reasoning pipeline over each student's structured
-intake, not a single prompt:
+## Architecture Diagram
 
 ```text
-27-question structured intake (7 sections)
-  -> 1. Normalize the goal into a career domain, target roles, required skills
-  -> 2. Gather live public signals (Wikipedia, OpenAlex, GitHub) + registries
-  -> 3. Score the profile honestly (coverage + evidence) and surface gaps
-  -> 4. Reason with Foundry IQ to produce career intelligence:
-        job-market status, salary outlook, risk strategy, fallback options,
-        and a 12-week timetable grounded in the student's real profile
-  -> 5. Build a staged roadmap, portfolio plan, and university matches
-  -> 6. Answer follow-ups in a live mentor chat grounded in the report
+Student
+  |
+  v
+Next.js UI
+  |-- Login / local demo auth
+  |-- Guided intake
+  |-- Generated dashboard
+  |-- AI Mentor chat
+  |
+  v
+API Routes
+  |-- /api/auth/*      -> local account flow
+  |-- /api/insights    -> report generation
+  |-- /api/mentor      -> streaming mentor answers
+  |-- /api/reports     -> saved reports
+  |
+  v
+Reasoning Layer
+  |-- student-os-engine.ts  -> deterministic profile, score, roadmap
+  |-- intelligence.ts       -> career intelligence enrichment
+  |-- ai-provider.ts        -> Azure/OpenAI/Anthropic provider chain
+  |
+  v
+Providers And Storage
+  |-- Azure AI Foundry / Azure OpenAI
+  |-- Optional OpenAI or Anthropic fallback
+  |-- Offline deterministic mentor fallback
+  |-- data/app-database.json for local demo storage
 ```
 
-Each step feeds the next, and every output is traceable back to the
-student's answers.
+## Agent Descriptions
 
-## Microsoft Foundry IQ integration
+- Intake Agent: converts a student's profile answers into structured signals
+  such as dream role, study intent, skills, budget, country preferences, and
+  weekly availability.
+- Career Reasoning Agent: normalizes the dream role into a field, target roles,
+  required skills, missing skills, and readiness score.
+- Career Intelligence Agent: produces market outlook, salary framing, risks,
+  mitigations, fallback options, and a detailed weekly timetable.
+- Roadmap Agent: builds staged plan phases and converts them into a career
+  journey chart and Weekly Plan timeline.
+- Mentor Agent: answers follow-up questions through `/api/mentor`, grounded in
+  the generated report and live provider chain.
+- Safety Agent: keeps claims honest, avoids guarantees, and reminds students to
+  verify official university, visa, scholarship, salary, and job details.
 
-The reasoning layer is provider-abstracted in
-[`src/lib/ai-provider.ts`](src/lib/ai-provider.ts). The chain is:
+## Innovation
 
-1. **Microsoft Foundry IQ (Azure AI Foundry)** — primary reasoning for the
-   mentor (`src/app/api/mentor/route.ts`) and career intelligence
-   (`src/lib/intelligence.ts`).
-2. Fallback reasoning providers (used only if Foundry is unavailable).
-3. **Deterministic offline engine** — grounded, profile-specific output so
-   the product never breaks during a demo.
+- Combines study planning and career execution instead of treating them as separate workflows.
+- Uses a generated report as the memory/context for the AI Mentor, so answers
+  are specific to the student's goal, skills, gaps, roadmap, country, and
+  budget.
+- Keeps the product demoable without paid AI access through a deterministic
+  offline reasoning path.
+- Supports formal-study and non-study pathways, so students are not forced into
+  university recommendations when they choose flexible routes.
+- Shows visible readiness scoring and journey progress rather than a vague
+  recommendation list.
 
-When Foundry IQ is active, the UI shows it live: the mentor displays
-"Powered by Microsoft Foundry IQ" and the Career Intelligence tab shows
-"Grounded with Microsoft Foundry IQ".
+## Impact
 
-## Agents League submission checklist
+Aimura AI helps students move from uncertainty to action. A student can finish
+the intake and immediately see:
 
-- **Track selected:** Reasoning Agents.
-- **Required Microsoft IQ layer:** Foundry IQ via Azure AI Foundry.
-- **Where judges can see it:** login landing, generated report overview,
-  Career Intelligence tab, and AI Mentor status label.
-- **Public-repo readiness:** `.env` and `data/app-database.json` are
-  gitignored; use only neutral or synthetic student profiles in demos.
-- **Safety posture:** no admission, visa, scholarship, salary, or job
-  guarantees; every report asks students to verify official sources.
-- **Demo flow:** create a local account, complete the guided intake, generate
-  the Student OS, show the Microsoft IQ proof card, ask the AI Mentor "What
-  should I do this week?", and demonstrate the external-link confirmation.
-- **Deadline from the brief:** submit before June 14, 2026.
+- Where they stand now.
+- Which skills matter most.
+- What proof they should build.
+- Which study options fit their situation.
+- What to do this week.
+- How to ask a mentor targeted follow-up questions.
 
-Full technical and submission notes live in
-[`docs/aimura-ai-full-documentation.md`](docs/aimura-ai-full-documentation.md).
+For schools, counsellors, and hackathon demos, it provides a repeatable way to
+generate structured, explainable career guidance without exposing private API
+keys or requiring a production database.
 
-Official references:
+## Screenshots
 
-- [Agents League Hack @ AI Skills Fest - Microsoft Reactor](https://developer.microsoft.com/en-us/reactor/series/s-1658/)
-- [Microsoft IQ requirement example - Microsoft 365 Developer Blog](https://devblogs.microsoft.com/microsoft365dev/agents-league-hackathon-2026-enterprise-agents/)
-
-### Configure Foundry IQ
-
-1. In the [Azure AI Foundry portal](https://ai.azure.com), create a project
-   and deploy a chat model (e.g. `gpt-4o-mini`).
-2. Copy `.env.example` to `.env` and fill in:
-
-   ```bash
-   AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE.openai.azure.com/
-   AZURE_OPENAI_KEY=YOUR_KEY
-   AZURE_DEPLOYMENT_NAME=gpt-4o-mini
-   AZURE_OPENAI_API_VERSION=2024-10-21
-   ```
-
-3. Restart the app. The mentor and career intelligence now reason on
-   Foundry IQ.
-
-## Reliability & safety
-
-- **Resilient provider chain** — Foundry IQ → fallback providers → offline.
-  A missing key, rate limit, or exhausted credit is skipped automatically;
-  the app keeps working.
-- **External-link confirmation** — every outbound link (universities,
-  courses, repositories) opens a confirmation dialog showing the exact
-  destination before the user leaves the app
-  ([`src/components/LinkGuard.tsx`](src/components/LinkGuard.tsx)).
-- **Honest framing** — Aimura provides guidance, not guarantees, and every
-  report carries a safety note to verify admissions, visa, scholarship,
-  cost, and employment details with official providers.
-- **No secrets in the repo** — `.env` is gitignored; only `.env.example`
-  placeholders are committed.
-
-## Run it — one command, any device
-
-### macOS
-Double-click `open_aimura_ai.command` (or run `./open_aimura_ai.command`).
-
-### Windows / PC
-Double-click `open_aimura_windows.bat`.
-
-Both launchers install dependencies on first run, start the app, open the
-browser, and **print a phone URL** so a mobile device on the same Wi-Fi can
-open it too:
+Screenshots are included in the repository:
 
 ```text
-On this computer : http://localhost:3000
-On your phone    : http://<your-LAN-IP>:3000
+screenshots/aimura-next-desktop.png
+screenshots/aimura-next-mobile.png
+screenshots/aimura-career-os-desktop.png
+screenshots/aimura-career-os-mobile.png
 ```
 
-### Manual launch
+You can embed them in GitHub later with Markdown image links, for example:
+
+```md
+![Aimura desktop dashboard](screenshots/aimura-career-os-desktop.png)
+```
+
+## Demo Video
+
+Demo video link:
+
+```text
+Add your YouTube, Loom, or OneDrive demo video link here before submission.
+```
+
+## Tech Stack
+
+- Next.js App Router
+- React
+- TypeScript
+- Tailwind CSS
+- Lucide icons
+- Local JSON storage for demo accounts and saved reports
+- Azure AI Foundry / Azure OpenAI for live reasoning
+- Optional OpenAI or Anthropic fallback providers
+
+## AI Mentor And API Behavior
+
+The Mentor tab has two different parts:
+
+- Suggestion chips are static starter prompts, such as "What should I do this
+  week?" or "What project should I build?"
+- The actual mentor answer is generated by `/api/mentor`.
+
+Provider order:
+
+1. Microsoft Foundry IQ / Azure AI Foundry
+2. Anthropic, if configured
+3. OpenAI, if configured
+4. Offline deterministic mentor, if no live provider works
+
+The offline mentor is intentional so demos never break, but if Azure is
+configured correctly the Mentor header should show:
+
+```text
+Powered by Microsoft Foundry IQ
+```
+
+The app accepts either Azure key variable name:
+
+```env
+AZURE_OPENAI_KEY=your_key
+# or
+AZURE_OPENAI_API_KEY=your_key
+```
+
+The app also accepts these Azure deployment variable names:
+
+```env
+AZURE_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+```
+
+You must restart the Next.js dev server after changing `.env`.
+
+## Environment Setup
+
+Copy `.env.example` to `.env` and fill only the providers you want to use.
+
+Required for Microsoft Foundry IQ / Azure AI Foundry:
+
+```env
+AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE.openai.azure.com/
+AZURE_OPENAI_KEY=YOUR_KEY
+AZURE_OPENAI_API_KEY=
+AZURE_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+Optional fallback providers:
+
+```env
+OPENAI_API_KEY=
+AIMURA_BACKUP_MODEL=gpt-4o-mini
+
+ANTHROPIC_API_KEY=
+AIMURA_PRIMARY_MODEL=
+```
+
+Never commit `.env`.
+
+## Run Locally
+
+Install dependencies:
 
 ```bash
 npm install
-npm run dev -- --hostname 0.0.0.0 --port 3000
-# open http://localhost:3000
 ```
 
-## Share it so friends can test in their browser
+Start the app:
 
-Two ways to let anyone, anywhere, open Aimura AI in their browser:
+```bash
+npm run dev -- --hostname 0.0.0.0 --port 3000
+```
 
-**1. Instant public link (no account, no deploy).** Double-click
-`share_aimura.command` (macOS) or `share_aimura_windows.bat` (Windows). It starts
-the app and prints a temporary `https://…` link — send that to friends and they
-can use it on any device. Keep the window open while they test; press `Ctrl+C` to
-stop sharing.
+Open:
 
-**2. Always-on link (free hosting).** The app is deploy-safe: if the host's
-filesystem is read-only it keeps running in memory, so the full flow (intake →
-report → mentor) works without login. Push this repo to GitHub and import it on
-[Vercel](https://vercel.com/new) (framework auto-detected as Next.js) to get a
-permanent public URL.
+```text
+http://localhost:3000
+```
 
-## Project structure
+Windows users can also double-click:
+
+```text
+open_aimura_windows.bat
+```
+
+macOS users can run:
+
+```bash
+./open_aimura_ai.command
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+Note: the production build may need network access because `next/font` fetches
+Google-hosted Geist fonts during build.
+
+## Project Structure
 
 ```text
 src/
 |-- app/
 |   |-- api/
-|   |   |-- auth/            # local signup/login
-|   |   |-- insights/       # builds the report + Foundry IQ enrichment
-|   |   `-- mentor/          # streaming mentor (Foundry IQ -> fallback -> offline)
-|   |-- layout.tsx          # wraps the app in the external-link guard
-|   `-- page.tsx            # gated login -> authenticated workspace
-|-- components/             # login landing, 27-question intake, dashboard, mentor
-|   |-- PremiumUI.tsx       # AppShell, cards, metrics, toast, progress, actions
-|   |-- ModuleSidebar.tsx   # responsive accent-coded report navigator
-|   |-- RoadmapTimeline.tsx # weekly plan timeline/stepper
-|   |-- ReasoningPanel.tsx  # expandable AI decision logic trace
-|   `-- ExportActions.tsx   # PDF/save/email states and toasts
+|   |   |-- auth/       # signup, login, activation, forgot/reset password
+|   |   |-- insights/   # report generation and AI career intelligence
+|   |   |-- mentor/     # streaming mentor chat API
+|   |   `-- reports/    # saved reports
+|   |-- globals.css     # Tailwind theme and global UI styles
+|   |-- layout.tsx
+|   `-- page.tsx
+|-- components/
+|   |-- MultiStepForm.tsx
+|   |-- ReportDashboard.tsx
+|   |-- JourneyChart.tsx
+|   |-- MentorChat.tsx
+|   |-- RoadmapTimeline.tsx
+|   |-- ModuleSidebar.tsx
+|   |-- PremiumUI.tsx
+|   `-- ExportActions.tsx
 `-- lib/
-    |-- category-theme.ts   # central category accent mapping
-    |-- ai-provider.ts      # Foundry IQ + fallback reasoning chain
-    |-- intelligence.ts     # career intelligence (Foundry IQ + offline)
-    |-- student-os-engine.ts# deterministic domain/skill/roadmap engine
-    `-- app-data-store.ts   # local JSON account + report storage
+    |-- ai-provider.ts       # live provider chain
+    |-- intelligence.ts      # career intelligence enrichment
+    |-- student-os-engine.ts # deterministic report engine
+    |-- app-data-store.ts    # local JSON demo storage
+    `-- student-os-types.ts
 ```
 
-## Data storage
+Python support files and tests are also included for the original reasoning
+pipeline:
 
-Accounts and saved reports use local JSON storage at
-`data/app-database.json` (gitignored). This keeps a GitHub-download demo
-portable without a database server. Upgrade paths: SQLite, Supabase
-Postgres, Firebase, or Neon.
-
-## Verification
-
-```bash
-npx tsc --noEmit
-npm run build
+```text
+agent.py
+app.py
+pipeline.py
+student_os.py
+scorer.py
+tests/
+scripts/
 ```
 
-## Safety limits
+## Data Storage
 
-Aimura AI provides educational and career guidance. It does not guarantee
-university admission, visa approval, scholarships, salaries, or job offers.
-Students must verify official requirements directly with universities, visa
-authorities, scholarship providers, and employers.
+Local demo accounts and generated reports are stored in:
+
+```text
+data/app-database.json
+```
+
+This file is gitignored because it can contain real user/demo data.
+
+Static sample data that is safe to commit:
+
+```text
+data/career_roles.csv
+data/countries.csv
+data/exams.csv
+data/fields.csv
+data/universities_sample.csv
+```
+
+
+## Safety
+
+Aimura AI provides educational and career guidance only. It does not guarantee
+admission, visas, scholarships, salaries, or job offers. Students should verify
+official details with universities, visa authorities, scholarship providers,
+and employers.

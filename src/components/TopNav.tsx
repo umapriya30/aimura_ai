@@ -3,18 +3,38 @@
 import { LogOut, MessageSquare, Route, Sparkles } from "lucide-react";
 import { type AuthUser } from "@/lib/student-os-types";
 
+export type WorkspaceView = "profile" | "results";
+
 type TopNavProps = {
   sessionUser: AuthUser;
   latestActivity?: string;
   hasReport: boolean;
   onLogout: () => void;
   onJumpTo: (sectionId: string) => void;
+  activeView: WorkspaceView;
+  onNavigate: (view: WorkspaceView) => void;
 };
 
-export function TopNav({ sessionUser, latestActivity, hasReport, onLogout, onJumpTo }: TopNavProps) {
+export function TopNav({ sessionUser, latestActivity, hasReport, onLogout, onJumpTo, activeView, onNavigate }: TopNavProps) {
+  const navButton = (view: WorkspaceView, label: string, Icon: typeof Route, disabled = false) => (
+    <button
+      className={`aimura-focus-ring inline-flex min-w-0 items-center justify-center gap-2 rounded-control border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
+        activeView === view
+          ? "border-aimura-green/50 bg-aimura-green/10 text-aimura-white shadow-[0_0_28px_rgb(44_230_161_/_0.16)]"
+          : "border-white/10 bg-white/[0.035] text-aimura-muted hover:border-aimura-green/40 hover:text-aimura-white"
+      }`}
+      disabled={disabled}
+      onClick={() => onNavigate(view)}
+      type="button"
+    >
+      <Icon className="size-4" aria-hidden />
+      {label}
+    </button>
+  );
+
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-aimura-ink/72 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-12">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-8 lg:flex-nowrap lg:gap-4 lg:px-12">
         <button
           className="aimura-focus-ring flex items-center gap-3 text-left"
           onClick={() => onJumpTo("top")}
@@ -29,26 +49,12 @@ export function TopNav({ sessionUser, latestActivity, hasReport, onLogout, onJum
           </span>
         </button>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <button
-            className="aimura-focus-ring inline-flex items-center gap-2 rounded-control border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-semibold text-aimura-muted transition hover:border-aimura-green/40 hover:text-aimura-white"
-            onClick={() => onJumpTo("wizard")}
-            type="button"
-          >
-            <Route className="size-4" aria-hidden />
-            Intake
-          </button>
-          <button
-            className="aimura-focus-ring inline-flex items-center gap-2 rounded-control border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-semibold text-aimura-muted transition hover:border-aimura-green/40 hover:text-aimura-white"
-            onClick={() => onJumpTo("report")}
-            type="button"
-          >
-            <MessageSquare className="size-4" aria-hidden />
-            {hasReport ? "Roadmap" : "Report preview"}
-          </button>
+        <div className="order-last grid w-full grid-cols-2 items-center gap-2 pt-1 sm:w-auto sm:flex lg:order-none lg:pt-0">
+          {navButton("profile", "Profile Intake", Route)}
+          {navButton("results", hasReport ? "Focused Results" : "Results locked", MessageSquare, !hasReport)}
         </div>
 
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div className="hidden max-w-xs truncate rounded-control border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-aimura-muted md:block">
             {latestActivity || `Signed in as ${sessionUser.name}`}
           </div>
