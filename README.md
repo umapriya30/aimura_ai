@@ -127,6 +127,8 @@ You can embed them in GitHub later with Markdown image links, for example:
 ```md
 ![Aimura desktop dashboard](screenshots/aimura-career-os-desktop.png)
 ```
+## Live
+https://aimura-ai.vercel.app/
 
 ## Demo Video
 
