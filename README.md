@@ -132,7 +132,7 @@ https://aimura-ai.vercel.app/
 
 ## Demo Video
 
-Youtube video link: https://youtu.be/J5HeCbWI4BI
+Youtube video link: https://youtu.be/wfpN9FFSn_g
 
 
 ## Tech Stack
