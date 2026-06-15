@@ -130,11 +130,8 @@ You can embed them in GitHub later with Markdown image links, for example:
 
 ## Demo Video
 
-Demo video link:
+Youtube video link: https://youtu.be/K7Ups88vpUI
 
-```text
-Add your YouTube, Loom, or OneDrive demo video link here before submission.
-```
 
 ## Tech Stack
 
