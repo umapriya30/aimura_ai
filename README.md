@@ -16,9 +16,9 @@ The app includes:
 - Local demo auth with activation and password-reset links shown inside the app.
 
 ## Team Members
-Ankit Ranjan
+1. Ankit Ranjan
 Github link : https://github.com/ankitranjan-dsai
-Uma Siva Priya
+2. Uma Siva Priya
 Github link : https://github.com/umapriya30
 
 ## Problem Statement
@@ -127,7 +127,7 @@ You can embed them in GitHub later with Markdown image links, for example:
 ```md
 ![Aimura desktop dashboard](screenshots/aimura-career-os-desktop.png)
 ```
-## Live
+## On-Live
 https://aimura-ai.vercel.app/
 
 ## Demo Video
