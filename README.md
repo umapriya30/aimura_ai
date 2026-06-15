@@ -35,6 +35,8 @@ mentor that answers follow-up questions using the student's generated report.
 
 ## Architecture Diagram
 
+![Aimura AI architecture overview](docs/architecture-diagram.jpg)
+
 ```text
 Student
   |
